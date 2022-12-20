@@ -187,7 +187,6 @@ wms_make_param_list(
 	AST_MEM_CHECK(param);
 	memset(param, 0, sizeof(struct wms_param));
 	param->symbol = symbol;
-	param->next = NULL;
 
 	if (param_list == NULL) {
 		param_list = malloc(sizeof(struct wms_param_list));
@@ -828,10 +827,9 @@ free_func(
 	
 	free(func->name);
 	if (func->param_list != NULL) {
-		if (func->param_list->list != NULL) {
-			free_param(func->param_list->list);
-			free(func->param_list);
-		}
+		assert(func->param_list->list != NULL);
+		free_param(func->param_list->list);
+		free(func->param_list);
 	}
 	if (func->stmt_list != NULL)
 		free_stmt_list(func->stmt_list);
@@ -842,7 +840,7 @@ static void
 free_param(struct wms_param *param)
 {
 	if (param->next != NULL)
-		free(param->next);
+		free_param(param->next);
 
 	free(param->symbol);
 	free(param);
