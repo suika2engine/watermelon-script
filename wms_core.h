@@ -299,14 +299,14 @@ struct wms_runtime {
  */
 
 struct wms_func_list *wms_make_func_list(struct wms_func_list *func_list, struct wms_func *func);
-struct wms_func *wms_make_func(const char *name, struct wms_param_list *param_list, struct wms_stmt_list *stmt_list);
+struct wms_func *wms_make_func(char *name, struct wms_param_list *param_list, struct wms_stmt_list *stmt_list);
 struct wms_param_list *wms_make_param_list(struct wms_param_list *param_list, const char *symbol);
 struct wms_stmt_list *wms_make_stmt_list(struct wms_stmt_list *stmt_list, struct wms_stmt *stmt);
 void wms_set_stmt_position(struct wms_stmt *stmt, int line);
 struct wms_stmt *wms_make_stmt_with_nothing(void);
 struct wms_stmt *wms_make_stmt_with_expr(struct wms_expr *expr);
-struct wms_stmt *wms_make_stmt_with_symbol_assign(const char *symbol, struct wms_expr *rhs);
-struct wms_stmt *wms_make_stmt_with_array_assign(const char *symbol, struct wms_expr *subscript, struct wms_expr *rhs);
+struct wms_stmt *wms_make_stmt_with_symbol_assign(char *symbol, struct wms_expr *rhs);
+struct wms_stmt *wms_make_stmt_with_array_assign(char *symbol, struct wms_expr *subscript, struct wms_expr *rhs);
 struct wms_stmt *wms_make_stmt_with_if(struct wms_expr *cond, struct wms_stmt_list *stmt_list);
 struct wms_stmt *wms_make_stmt_with_elif(struct wms_expr *cond, struct wms_stmt_list *stmt_list);
 struct wms_stmt *wms_make_stmt_with_else(struct wms_stmt_list *stmt_list);

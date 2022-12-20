@@ -156,7 +156,7 @@ wms_make_func_list(
 
 struct wms_func *
 wms_make_func(
-	const char *name,
+	char *name,
 	struct wms_param_list *param_list,
 	struct wms_stmt_list *stmt_list)
 {
@@ -166,8 +166,7 @@ wms_make_func(
 
 	f = malloc(sizeof(struct wms_func));
 	AST_MEM_CHECK(f);
-	f->name = strdup(name);
-	AST_MEM_CHECK(f->name);
+	f->name = name;
 	f->param_list = param_list;
 	f->stmt_list = stmt_list;
 	return f;
@@ -272,7 +271,7 @@ wms_make_stmt_with_expr(
 
 struct wms_stmt *
 wms_make_stmt_with_symbol_assign(
-	const char *symbol,
+	char *symbol,
 	struct wms_expr *rhs)
 {
 	struct wms_stmt *stmt;
@@ -285,9 +284,9 @@ wms_make_stmt_with_symbol_assign(
 
 	assign_stmt = malloc(sizeof(struct wms_assign_stmt));
 	AST_MEM_CHECK(assign_stmt);
+	memset(assign_stmt, 0, sizeof(struct wms_assign_stmt));
 	assign_stmt->type.is_var = 1;
-	assign_stmt->lhs.symbol = strdup(symbol);
-	AST_MEM_CHECK(assign_stmt->lhs.symbol);
+	assign_stmt->lhs.symbol = symbol;
 	assign_stmt->rhs = rhs;
 
 	stmt->of.assign = assign_stmt;
@@ -296,7 +295,7 @@ wms_make_stmt_with_symbol_assign(
 
 struct wms_stmt *
 wms_make_stmt_with_array_assign(
-	const char *symbol,
+	char *symbol,
 	struct wms_expr *subscript,
 	struct wms_expr *rhs)
 {
@@ -312,8 +311,7 @@ wms_make_stmt_with_array_assign(
 	AST_MEM_CHECK(assign_stmt);
 	memset(assign_stmt, 0, sizeof(struct wms_assign_stmt));
 	assign_stmt->type.is_array = 1;
-	assign_stmt->lhs.array.symbol = strdup(symbol);
-	AST_MEM_CHECK(assign_stmt->lhs.array.symbol);
+	assign_stmt->lhs.array.symbol = symbol;
 	assign_stmt->lhs.array.subscript = subscript;
 	assign_stmt->rhs = rhs;
 
