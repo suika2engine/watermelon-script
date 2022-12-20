@@ -894,12 +894,13 @@ free_stmt(
 		if (stmt->of._while->stmt_list != NULL)
 			free_stmt_list(stmt->of._while->stmt_list);
 		free(stmt->of._while);
-	} else if (stmt->type.is_while) {
+	} else if (stmt->type.is_for) {
 		free(stmt->of._for->key_symbol);
 		free(stmt->of._for->value_symbol);
-		free_expr(stmt->of._for->array_expr);
+		if (stmt->of._for->array_expr != NULL)
+			free_expr(stmt->of._for->array_expr);
 		if (stmt->of._for->stmt_list != NULL)
-			free_stmt_list(stmt->of._while->stmt_list);
+			free_stmt_list(stmt->of._for->stmt_list);
 		free(stmt->of._while);
 	} else if (stmt->type.is_return) {
 		free_expr(stmt->of._return->expr);
