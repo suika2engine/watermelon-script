@@ -141,6 +141,7 @@ wms_make_func_list(
 	if (func_list == NULL) {
 		func_list = malloc(sizeof(struct wms_func_list));
 		AST_MEM_CHECK(func_list);
+		memset(func_list, 0, sizeof(struct wms_func_list));
 		func_list->list = func;
 		ast = func_list;
 		return func_list;
@@ -166,6 +167,7 @@ wms_make_func(
 
 	f = malloc(sizeof(struct wms_func));
 	AST_MEM_CHECK(f);
+	memset(f, 0, sizeof(struct wms_func));
 	f->name = name;
 	f->param_list = param_list;
 	f->stmt_list = stmt_list;
@@ -175,7 +177,7 @@ wms_make_func(
 struct wms_param_list *
 wms_make_param_list(
 	struct wms_param_list *param_list,
-	const char *symbol)
+	char *symbol)
 {
 	struct wms_param *param, *p;
 
@@ -183,13 +185,14 @@ wms_make_param_list(
 
 	param = malloc(sizeof(struct wms_param));
 	AST_MEM_CHECK(param);
-	param->symbol = strdup(symbol);
-	AST_MEM_CHECK(param->symbol);
+	memset(param, 0, sizeof(struct wms_param));
+	param->symbol = symbol;
 	param->next = NULL;
 
 	if (param_list == NULL) {
 		param_list = malloc(sizeof(struct wms_param_list));
 		AST_MEM_CHECK(param_list);
+		memset(param_list, 0, sizeof(struct wms_param_list));
 		param_list->list = param;
 		return param_list;
 	}
@@ -214,7 +217,8 @@ wms_make_stmt_list(
 
 	if (stmt_list == NULL) {
 		stmt_list = malloc(sizeof(struct wms_stmt_list));
-	AST_MEM_CHECK(stmt_list);
+		AST_MEM_CHECK(stmt_list);
+		memset(stmt_list, 0, sizeof(struct wms_stmt_list));
 		stmt_list->list = stmt;
 		return stmt_list;
 	}
@@ -263,6 +267,7 @@ wms_make_stmt_with_expr(
 
 	expr_stmt = malloc(sizeof(struct wms_expr_stmt));
 	AST_MEM_CHECK(expr_stmt);
+	memset(expr_stmt, 0, sizeof(struct wms_expr_stmt));
 	expr_stmt->expr = expr;
 
 	stmt->of.expr = expr_stmt;
@@ -334,6 +339,7 @@ wms_make_stmt_with_if(
 
 	if_stmt = malloc(sizeof(struct wms_if_stmt));
 	AST_MEM_CHECK(if_stmt);
+	memset(if_stmt, 0, sizeof(struct wms_if_stmt));
 	if_stmt->cond = cond;
 	if_stmt->stmt_list = stmt_list;
 
@@ -354,6 +360,7 @@ wms_make_stmt_with_elif(struct wms_expr *cond, struct wms_stmt_list *stmt_list)
 
 	elif_stmt = malloc(sizeof(struct wms_elif_stmt));
 	AST_MEM_CHECK(elif_stmt);
+	memset(elif_stmt, 0, sizeof(struct wms_elif_stmt));
 	elif_stmt->cond = cond;
 	elif_stmt->stmt_list = stmt_list;
 
@@ -375,6 +382,7 @@ wms_make_stmt_with_else(
 
 	else_stmt = malloc(sizeof(struct wms_else_stmt));
 	AST_MEM_CHECK(else_stmt);
+	memset(else_stmt, 0, sizeof(struct wms_else_stmt));
 	else_stmt->stmt_list = stmt_list;
 
 	stmt->of._else = else_stmt;
@@ -396,6 +404,7 @@ wms_make_stmt_with_while(
 
 	while_stmt = malloc(sizeof(struct wms_while_stmt));
 	AST_MEM_CHECK(while_stmt);
+	memset(while_stmt, 0, sizeof(struct wms_while_stmt));
 	while_stmt->cond = cond;
 	while_stmt->stmt_list = stmt_list;
 
@@ -420,6 +429,7 @@ wms_make_stmt_with_for(
 
 	for_stmt = malloc(sizeof(struct wms_for_stmt));
 	AST_MEM_CHECK(for_stmt);
+	memset(for_stmt, 0, sizeof(struct wms_for_stmt));
 	for_stmt->is_range = false;
 	for_stmt->key_symbol = key;
 	for_stmt->value_symbol = val;
@@ -447,6 +457,7 @@ wms_make_stmt_with_for_range(
 
 	for_stmt = malloc(sizeof(struct wms_for_stmt));
 	AST_MEM_CHECK(for_stmt);
+	memset(for_stmt, 0, sizeof(struct wms_for_stmt));
 	for_stmt->is_range = true;
 	for_stmt->start = start;
 	for_stmt->end = end;
@@ -471,6 +482,7 @@ wms_make_stmt_with_return(
 
 	return_stmt = malloc(sizeof(struct wms_return_stmt));
 	AST_MEM_CHECK(return_stmt);
+	memset(return_stmt, 0, sizeof(struct wms_return_stmt));
 	return_stmt->expr = expr;
 
 	stmt->of._return = return_stmt;
@@ -781,6 +793,7 @@ wms_make_arg_list(
 	if (arg_list == NULL) {
 		arg_list = malloc(sizeof(struct wms_arg_list));
 		AST_MEM_CHECK(arg_list);
+		memset(arg_list, 0, sizeof(struct wms_arg_list));
 		arg_list->list = expr;
 		return arg_list;
 	}
@@ -1094,7 +1107,7 @@ eval_func(
 		return false;
 
 	/* Evaluate statements. */
-	ret = false;
+	ret = brk = cont = false;
 	if (!eval_stmt_list(rt, func->stmt_list, &val, &ret, &brk, &cont))
 		return false;
 	if (brk)
