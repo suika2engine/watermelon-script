@@ -35,6 +35,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	script[len] = '\0';
+	fclose(fp);
 
 	/* Parse. */
 	rt = wms_make_runtime(script);

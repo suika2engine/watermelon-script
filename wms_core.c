@@ -909,6 +909,7 @@ free_expr(
 	} else if (expr->type.is_lt || expr->type.is_lte ||
 		   expr->type.is_gt || expr->type.is_gte ||
 		   expr->type.is_lt || expr->type.is_lte || expr->type.is_eq ||
+		   expr->type.is_plus || expr->type.is_minus ||
 		   expr->type.is_mul || expr->type.is_div) {
 		free_expr(expr->val.expr[0]);
 		free_expr(expr->val.expr[1]);
