@@ -2301,18 +2301,17 @@ put_array_elem_value(
 		RT_MEM_CHECK(var);
 		memset(var, 0, sizeof(struct wms_variable));
 		var->name = symbol;
-		var->next = rt->frame->var_list;
-		rt->frame->var_list = var;
 		var->val.type.is_array = 1;
 		var->val.val.a_index = alloc_elem_index(rt, true);
 		if (var->val.val.a_index == -1)
 			return false;
+		var->next = rt->frame->var_list;
+		rt->frame->var_list = var;
 	} else if (!var->val.type.is_array) {
 		/* If found and it's not an array, recreate variable. */
 		if (var->val.type.is_str)
 			decrement_str_ref(rt, var->val.val.s_index);
-		memset(var, 0, sizeof(struct wms_variable));
-		var->name = symbol;
+		memset(&var->val, 0, sizeof(struct wms_value));
 		var->val.type.is_array = 1;
 		var->val.val.a_index = alloc_elem_index(rt, true);
 		if (var->val.val.a_index == -1)
