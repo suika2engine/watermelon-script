@@ -310,6 +310,7 @@ wms_make_stmt_with_array_assign(
 
 	assign_stmt = malloc(sizeof(struct wms_assign_stmt));
 	AST_MEM_CHECK(assign_stmt);
+	memset(assign_stmt, 0, sizeof(struct wms_assign_stmt));
 	assign_stmt->type.is_array = 1;
 	assign_stmt->lhs.array.symbol = strdup(symbol);
 	AST_MEM_CHECK(assign_stmt->lhs.array.symbol);
@@ -720,7 +721,6 @@ wms_make_term_with_str(
 	memset(term, 0, sizeof(struct wms_term));
 	term->type.is_str = 1;
 	term->val.s = s;
-	AST_MEM_CHECK(term->val.s);
 	return term;
 }
 
@@ -735,7 +735,6 @@ wms_make_term_with_symbol(
 	memset(term, 0, sizeof(struct wms_term));
 	term->type.is_symbol = 1;
 	term->val.symbol = symbol;
-	AST_MEM_CHECK(term->val.symbol);
 	return term;
 }
 
@@ -751,7 +750,6 @@ wms_make_term_with_array(
 	memset(term, 0, sizeof(struct wms_term));
 	term->type.is_array = 1;
 	term->val.array.symbol = symbol;
-	AST_MEM_CHECK(term->val.array.symbol);
 	term->val.array.subscript = subscript;
 	return term;
 }
@@ -768,7 +766,6 @@ wms_make_term_with_call(
 	memset(term, 0, sizeof(struct wms_term));
 	term->type.is_call = 1;
 	term->val.call.func = func;
-	AST_MEM_CHECK(term->val.call.func);
 	term->val.call.arg_list = arg_list;
 	return term;
 }
@@ -911,7 +908,9 @@ free_expr(
 
 	if (expr->type.is_term) {
 		free_term(expr->val.term);
-	} else if (expr->type.is_plus || expr->type.is_minus ||
+	} else if (expr->type.is_lt || expr->type.is_lte ||
+		   expr->type.is_gt || expr->type.is_gte ||
+		   expr->type.is_lt || expr->type.is_lte || expr->type.is_eq ||
 		   expr->type.is_mul || expr->type.is_div) {
 		free_expr(expr->val.expr[0]);
 		free_expr(expr->val.expr[1]);
@@ -1109,8 +1108,10 @@ eval_func(
 		return false;
 
 	/* Destroy frame */
-	rt->frame = frame->next;
-	free(frame);
+	frame = rt->frame;
+	rt->frame = rt->frame->next;
+	frame->next = NULL;
+	free_frame(rt, frame);
 
 	return result;
 }
@@ -2514,17 +2515,19 @@ decrement_array_ref(
 	assert(rt->elem_pool[a_index].is_used);
 	assert(rt->elem_pool[a_index].ref > 0);
 	rt->elem_pool[a_index].ref--;
+	if (rt->elem_pool[a_index].ref > 0)
+		return;
 
 	/* GC */
 	elem = get_array_head(rt, a_index);
 	while (elem != NULL) {
 		elem->is_used = false;
-		if (elem->is_head)
-			continue;
-		if (elem->val.type.is_str)
-			decrement_str_ref(rt, elem->val.val.s_index);
-		else if (elem->val.type.is_array)
-			decrement_array_ref(rt, elem->val.val.a_index);
+		if (!elem->is_head) {
+			if (elem->val.type.is_str)
+				decrement_str_ref(rt, elem->val.val.s_index);
+			else if (elem->val.type.is_array)
+				decrement_array_ref(rt, elem->val.val.a_index);
+		}
 		elem = elem->next;
 	}
 }
