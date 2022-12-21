@@ -33,7 +33,6 @@ func foo(a, b, c) {
 ### Types and Variables
 
 We have types for integer, floating point, string and array.
-An array element has a key and the key must be integer, floating point or string.
 ```
 func main() {
     // Integer
@@ -137,3 +136,51 @@ func foo() {
     return 6;
 }
 ```
+
+### Arrays
+
+An array element has a key, and the key must be one of integer, floating point and string.
+
+To create an array, assign a value with `[]` syntax.
+```
+func main() {
+    a[0] = 0;
+    print(a);
+}
+```
+
+To remove an array element, use `remove()`.
+```
+func main() {
+    a[0] = 0;
+    remove(a, 0);
+    print(a);
+}
+```
+
+To get the size of an array, use `size()`.
+```
+func main() {
+    a[0] = 0;
+    print(size(a));
+}
+```
+
+### Calling C Functions
+
+WMS have Foreign Function Interface (FFI).
+You can register C functions to WMS runtime as FFI functions,
+then you can call them inside WMS code.
+
+The CLI includes `hello()` FFI function.
+```
+func main() {
+    arg["hello"] = "hello";
+    hello(arg);
+    print(arg["hello"]);
+}
+```
+`hello()` FFI function changes the value of `arg["hello"]` to `"bonjour"`.
+
+Thus, FFI function can accept only one array as an argument and can modify the contents of the array.
+More precisely, the elements of this array must have string keys and string values.

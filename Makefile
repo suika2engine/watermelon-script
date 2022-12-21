@@ -1,13 +1,13 @@
 # cflags
-CFLAGS = -O0 -g3 -Wall -Werror -Wextra -Wundef -Wconversion
+CFLAGS = -Wall -Werror -Wextra -Wundef -Wconversion
 
 # testing binary
 wms: wms_parser.tab.c wms_lexer.yy.c wms_core.c main.c
-	gcc $(CFLAGS) -o $@ $^
+	gcc -O0 -g3 $(CFLAGS) -o $@ $^
 
 # testing binary for Windows
 wms.exe: wms_parser.tab.c wms_lexer.yy.c wms_core.c main.c
-	i686-w64-mingw32-gcc $(CFLAGS) -o $@ $^
+	i686-w64-mingw32-gcc -O2 $(CFLAGS) -s -o $@ $^
 
 # parser
 wms_parser.tab.c: wms_parser.y
