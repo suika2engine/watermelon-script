@@ -2568,7 +2568,7 @@ intrinsic_print(
 		print_value(rt, *val, false);
 		arg = arg->next;
 	}
-	printf("\n");
+	wms_printf("\n");
 	return true;
 }
 
@@ -2581,26 +2581,26 @@ print_value(
 	struct wms_array_elem *elem;
 
 	if (val.type.is_int) {
-		printf("%d", val.val.i);
+		wms_printf("%d", val.val.i);
 	} else if (val.type.is_float) {
-		printf("%f", val.val.f);
+		wms_printf("%f", val.val.f);
 	} else if (val.type.is_str) {
 		if (quote)
-			printf("\"%s\"", get_str(rt, val.val.s_index));
+			wms_printf("\"%s\"", get_str(rt, val.val.s_index));
 		else
-			printf("%s", get_str(rt, val.val.s_index));
+			wms_printf("%s", get_str(rt, val.val.s_index));
 	} else if (val.type.is_array) {
-		printf("[");
+		wms_printf("[");
 		elem = get_array_head(rt, val.val.a_index)->next;
 		while (elem != NULL) {
 			print_value(rt, elem->index, true);
-			printf(":");
+			wms_printf(":");
 			print_value(rt, elem->val, true);
 			elem = elem->next;
 			if (elem != NULL)
-				printf(", ");
+				wms_printf(", ");
 		}
-		printf("]");
+		wms_printf("]");
 	}
 }
 
@@ -2908,7 +2908,7 @@ wms_set_ffi_arg_value(
 static void
 out_of_memory(void)
 {
-	fprintf(stderr, "Out of memory.\n");
+	wms_printf("Out of memory.\n");
 }
 
 static bool 
