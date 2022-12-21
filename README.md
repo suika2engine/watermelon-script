@@ -7,8 +7,9 @@ It is designed to be intuitive and easily written by anyone who has any experien
 This repository provides command line interface (CLI) for WMS.
 New language features will be tested in this repository and then incorporated into Suika2.
 
-Functions
----------
+## Syntax and Usage
+
+### Defining and Calling Functions
 
 A program starts from `main()` function.
 ```
@@ -18,26 +19,46 @@ func main() {
 }
 ```
 
-Types and Variables
--------------------
-
-We have integer, floating point, string and array types.
-An array element has a key and its type can be integer, floating point and string.
-An array of an array is permitted.
+You can call other functions.
 ```
 func main() {
-    a = 1;
-    b = 1.0;
-    c = "1.0";
-    d[0] = 0;
-    e["key"] = d;
+    foo(0, 1 2);
+}
+
+func foo(a, b, c) {
+    return a + b + c;
 }
 ```
 
-Loops
------
+### Types and Variables
 
-We have a syntax for simple integer-range loop.
+We have types for integer, floating point, string and array.
+An array element has a key and the key must be integer, floating point or string.
+```
+func main() {
+    // Integer
+    a = 1;
+
+    // Floating point
+    b = 1.0;
+
+    // String
+    c = "str";
+
+    // Array (integer key)
+    d[0] = 0;
+
+    // Array (string key)
+    e["abc"] = 0;
+
+    // Array of array
+    f["key"] = e;
+}
+```
+
+### Loops
+
+We have a simple integer-range loop syntax.
 ```
 func main() {
     for(i in 0..9) {
@@ -46,7 +67,7 @@ func main() {
 }
 ```
 
-We have for-each style syntax.
+We also have a for-each style syntax.
 ```
 func main() {
     a[0] = 0;
@@ -59,7 +80,7 @@ func main() {
 }
 ```
 
-We have for-each with key style syntax.
+We can get key-value pair in for-each loop.
 ```
 func main() {
     a["key1"] = 0;
@@ -72,7 +93,7 @@ func main() {
 }
 ```
 
-We have while syntax.
+We have a normal `while` syntax.
 ```
 func main() {
     a = 10;
@@ -83,10 +104,23 @@ func main() {
 }
 ```
 
-Branches
---------
+Note that we can use `break` and `continue` in loops.
+```
+func main() {
+    for(i in 0..9) {
+        if(i == 2) {
+            continue;
+        }
+        if(i == 7) {
+            break;
+        }
+        print(i);
+    }
+```
 
-We have `if` - `else if` - `else` syntax.
+### Branches
+
+We can make branches by `if` - `else if` - `else` syntax.
 ```
 func main() {
     a = foo();
