@@ -86,7 +86,6 @@ static bool get_scalar_value(struct wms_runtime *rt, const char *symbol, struct 
 static bool get_array_elem_value(struct wms_runtime *rt, const char *symbol, struct wms_value index, struct wms_value *val);
 static int compare_values(struct wms_runtime *rt, struct wms_value val1, struct wms_value val2);
 static const char *index_to_string(struct wms_runtime *rt, struct wms_value index);
-static void remove_array_top_references(struct wms_runtime *rt, int a_index);
 static struct wms_array_elem *get_array_head(struct wms_runtime *rt, int a_index);
 static const char *get_str(struct wms_runtime *rt, int s_index);
 static void increment_str_ref(struct wms_runtime *rt, int s_index);
@@ -1811,7 +1810,7 @@ calc_str_plus_int(
 	const char *s1;
 	char s2[100];
 	char *tmp;
-	int len;
+	size_t len;
 
 	assert(rt != NULL);
 	assert(val1.type.is_str);
@@ -1841,7 +1840,7 @@ calc_str_plus_float(
 	const char *s1;
 	char s2[100];
 	char *tmp;
-	int len;
+	size_t len;
 
 	assert(rt != NULL);
 	assert(val1.type.is_str);
@@ -1870,7 +1869,7 @@ calc_str_plus_str(
 {
 	const char *s1, *s2;
 	char *tmp;
-	int len;
+	size_t len;
 
 	assert(rt != NULL);
 	assert(val1.type.is_str);
@@ -1971,8 +1970,8 @@ calc_div(
 			*result = value_by_int(val1.val.i / val2.val.i);
 			return true;
 		} else if (val2.type.is_float) {
-			*result = value_by_int((double)val1.val.i /
-					       val2.val.f);
+			*result = value_by_int((int)((double)val1.val.i /
+						     val2.val.f));
 			return true;
 		}
 	} else if (val1.type.is_float) {
@@ -2056,7 +2055,7 @@ do_call(
 	assert(val != NULL);
 
 	/* Search for intrinsics. */
-	for (i = 0; i < sizeof(intrinsic) / sizeof(struct intrinsic); i++)
+	for (i = 0; i < (int)(sizeof(intrinsic) / sizeof(struct intrinsic)); i++)
 		if (strcmp(intrinsic[i].name, term->val.call.func) == 0)
 			return intrinsic[i].func(rt, term->val.call.arg_list, val);
 
@@ -2658,34 +2657,6 @@ intrinsic_remove(
 		return rterror(rt, "No key found for array");
 	*ret = value_by_int(0);
 	return true;
-}
-
-static void
-remove_array_top_element(
-	struct wms_runtime *rt,
-	int a_index)
-{
-	struct wms_array_elem *elem;
-	int a_index_next, i;
-
-	assert(a_index != -1);
-
-	/* Get the first element (next of head). */
-	elem = get_array_head(rt, a_index)->next;
-	if (elem->next == NULL) {
-		/* elem is the last one. */
-		a_index_next = -1;
-	} else {
-		/* Get the index of elem->next. */
-		for (i = 0; i < WMS_ELEM_POOL; i++) {
-			if (&rt->elem_pool[i] == elem->next) {
-				a_index_next = i;
-				break;
-			}
-		}
-		assert(i != WMS_ELEM_POOL);
-	}
-
 }
 
 static bool

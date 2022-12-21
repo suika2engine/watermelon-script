@@ -6,14 +6,19 @@
 #include <stdio.h>
 #include "wms_core.h"
 
+#undef DEBUG
+#ifdef DEBUG
+static void _debug(const char *s);
+#define debug(s) _debug(s)
+#else
 #define debug(s)
+#endif
 
 extern int wms_parser_error_line;
 extern int wms_parser_error_column;
 
 int wms_yylex(void);
 void wms_yyerror(const char *s);
-static void _debug(const char *s);
 %}
 
 %union {
@@ -427,13 +432,16 @@ arg_list	: expr
 		;
 %%
 
+#ifdef DEBUG
 static void _debug(const char *s)
 {
 	fprintf(stderr, "%s\n", s);
 }
+#endif
 
 void wms_yyerror(const char *s)
 {
+	(void)s;
 	wms_parser_error_line = wms_yylloc.last_line + 1;
 	wms_parser_error_column = wms_yylloc.last_column + 1;
 }

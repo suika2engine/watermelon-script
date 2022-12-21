@@ -6,6 +6,9 @@
 #include "wms_parser.tab.h"
 #include "wms_core.h"
 
+#define YY_NO_INPUT
+#define YY_NO_UNPUT
+
 extern YYLTYPE yylloc;
 %}
 

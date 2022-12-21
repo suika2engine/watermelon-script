@@ -1,5 +1,10 @@
+/*
+ * CLI main code example.
+ */
+
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
 #include <assert.h>
 #include "wms.h"
 
@@ -9,7 +14,7 @@ char script[MAX_SCRIPT_SIZE];
 
 static bool WMSAPI hello(struct wms_runtime *rt, struct wms_value *arg);
 
-int main(int argc, char **argv)
+int main(int argc, char *argv[])
 {
 	struct wms_runtime *rt;
 	FILE *fp;
@@ -21,14 +26,12 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	/* Open the script file. */
+	/* Open and read the script file. */
 	fp = fopen(argv[1], "rb");
 	if (fp == NULL) {
 		fprintf(stderr, "Could not open script file %s\n", argv[1]);
 		return 1;
 	}
-
-	/* Read the script file. */
 	len = fread(script, 1, sizeof(script) - 1, fp);
 	if (len == 0 && ferror(fp) != 0) {
 		fprintf(stderr, "Could not read the script file.\n");
@@ -46,7 +49,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	/* Register foreign function. */
+	/* Register foreign function. (hello()) */
 	if (!wms_register_ffi_func(rt, "hello", hello)) {
 		fprintf(stderr, "%s.\n", wms_get_runtime_error_message(rt));
 		return 1;
@@ -71,9 +74,22 @@ static bool WMSAPI hello(struct wms_runtime *rt, struct wms_value *arg)
 {
 	assert(rt != NULL);
 
-	printf("Bonjour!\n");
-
 	wms_set_ffi_arg_value(rt, arg, "hello", "bonjour");
 
 	return true;
+}
+
+/*
+ * Printer. (for print() intrinsic function)
+ */
+int wms_printf(const char *s, ...)
+{
+	va_list ap;
+	int ret;
+
+	va_start(ap, s);
+	ret = vprintf(s, ap);
+	va_end(ap);
+
+	return ret;
 }

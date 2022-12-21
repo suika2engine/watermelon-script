@@ -38,6 +38,9 @@ const char *wms_get_runtime_error_message(struct wms_runtime *rt);
 /* Cleanup runtime. */
 void wms_free_runtime(struct wms_runtime *rt);
 
+/* Must be implemented by main code. */
+int wms_printf(const char *s, ...);
+
 /*
  * Foreign Function Interface
  */

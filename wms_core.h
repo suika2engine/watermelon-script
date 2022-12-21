@@ -63,17 +63,17 @@ struct wms_stmt_list {
 
 struct wms_stmt {
 	struct {
-		int is_empty : 1;
-		int is_expr : 1;
-		int is_assign : 1;
-		int is_if : 1;
-		int is_elif : 1;
-		int is_else : 1;
-		int is_while : 1;
-		int is_for : 1;
-		int is_return : 1;
-		int is_break : 1;
-		int is_continue : 1;
+		unsigned int is_empty : 1;
+		unsigned int is_expr : 1;
+		unsigned int is_assign : 1;
+		unsigned int is_if : 1;
+		unsigned int is_elif : 1;
+		unsigned int is_else : 1;
+		unsigned int is_while : 1;
+		unsigned int is_for : 1;
+		unsigned int is_return : 1;
+		unsigned int is_break : 1;
+		unsigned int is_continue : 1;
 	} type;
 	union {
 		struct wms_expr_stmt *expr;
@@ -97,8 +97,8 @@ struct wms_expr_stmt {
 
 struct wms_assign_stmt {
 	struct {
-		int is_var : 1;
-		int is_array : 1;
+		unsigned int is_var : 1;
+		unsigned int is_array : 1;
 	} type;
 	union {
 		char *symbol;
@@ -145,17 +145,17 @@ struct wms_return_stmt {
 
 struct wms_expr {
 	struct {
-		int is_term : 1;
-		int is_lt : 1;
-		int is_lte : 1;
-		int is_gt : 1;
-		int is_gte : 1;
-		int is_eq : 1;
-		int is_plus : 1;
-		int is_minus : 1;
-		int is_mul : 1;
-		int is_div : 1;
-		int is_neg : 1;
+		unsigned int is_term : 1;
+		unsigned int is_lt : 1;
+		unsigned int is_lte : 1;
+		unsigned int is_gt : 1;
+		unsigned int is_gte : 1;
+		unsigned int is_eq : 1;
+		unsigned int is_plus : 1;
+		unsigned int is_minus : 1;
+		unsigned int is_mul : 1;
+		unsigned int is_div : 1;
+		unsigned int is_neg : 1;
 	} type;
 	union {
 		struct wms_term *term;
@@ -166,12 +166,12 @@ struct wms_expr {
 
 struct wms_term {
 	struct {
-		int is_int : 1;
-		int is_float : 1;
-		int is_str : 1;
-		int is_symbol : 1;
-		int is_array : 1;
-		int is_call : 1;
+		unsigned int is_int : 1;
+		unsigned int is_float : 1;
+		unsigned int is_str : 1;
+		unsigned int is_symbol : 1;
+		unsigned int is_array : 1;
+		unsigned int is_call : 1;
 	} type;
 	union {
 		int i;
@@ -212,10 +212,10 @@ struct wms_array_elem;
 
 struct wms_value {
 	struct {
-		int is_int : 1;
-		int is_float : 1;
-		int is_str : 1;
-		int is_array : 1;
+		unsigned int is_int : 1;
+		unsigned int is_float : 1;
+		unsigned int is_str : 1;
+		unsigned int is_array : 1;
 	} type;
 	union {
 		int i;
