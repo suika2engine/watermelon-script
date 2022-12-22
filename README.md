@@ -30,7 +30,7 @@ func foo(a, b, c) {
 }
 ```
 
-You can call functions using string variable.
+You can indirectly call functions using string variable.
 ```
 func main() {
     myfunc = "foo";
@@ -40,11 +40,15 @@ func main() {
 func foo(a, b, c) {
     return a + b + c;
 }
+
+func myfunc(a, b, c) {
+    // This function will not be called because foo() will be called in main().
+}
 ```
 
 ### Types and Variables
 
-We have types for integer, floating point, string and array.
+You can use integer, floating point, string and array types.
 ```
 func main() {
     // Integer
@@ -201,16 +205,31 @@ Integer to string.
    s = "" + 123;
 ```
 
+Floating point to string.
+```
+   s = "" + 1.23;
+```
+
+Integer to floating point.
+```
+   f = 0.0 + 123;
+```
+
 String to integer.
 ```
    i = 0 + "123";
 ```
 
+String to floating point.
+```
+   f = 0.0 + "1.23";
+```
+
 ### Calling C Functions
 
-WMS have Foreign Function Interface (FFI).
-You can register C functions to WMS runtime as FFI functions,
-then you can call them inside WMS code.
+WMS has Foreign Function Interface (FFI).
+You can register C functions to a WMS runtime as FFI functions,
+and you can call them inside the WMS code.
 
 The CLI includes `hello()` FFI function to show example.
 ```
