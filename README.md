@@ -30,6 +30,18 @@ func foo(a, b, c) {
 }
 ```
 
+You can call functions using string variable.
+```
+func main() {
+    myfunc = "foo";
+    myfunc(0, 1 2);
+}
+
+func foo(a, b, c) {
+    return a + b + c;
+}
+```
+
 ### Types and Variables
 
 We have types for integer, floating point, string and array.
@@ -37,18 +49,33 @@ We have types for integer, floating point, string and array.
 func main() {
     // Integer
     a = 1;
+    if(isint(a)) {
+        print("a is int");
+    }
 
     // Floating point
     b = 1.0;
+    if(isfloat(b)) {
+        print("b is float");
+    }
 
     // String
-    c = "str";
+    c = "string";
+    if(isstr(c)) {
+        print("c is string");
+    }
 
     // Array (integer key)
     d[0] = 0;
+    if(isarray(d)) {
+        print("d is array");
+    }
 
     // Array (string key)
     e["abc"] = 0;
+    if(isarray(e)) {
+        print("e is array");
+    }
 
     // Array of array
     f["key"] = e;
@@ -57,7 +84,7 @@ func main() {
 
 ### Loops
 
-We have a simple integer-range loop syntax.
+You can use a syntax for simple integer-range loops.
 ```
 func main() {
     for(i in 0..9) {
@@ -66,7 +93,7 @@ func main() {
 }
 ```
 
-We also have a for-each style syntax.
+You can use a syntax for for-each loops.
 ```
 func main() {
     a[0] = 0;
@@ -79,7 +106,7 @@ func main() {
 }
 ```
 
-We can get key-value pair in for-each loop.
+You can use key-value pair in for-each loops.
 ```
 func main() {
     a["key1"] = 0;
@@ -92,7 +119,7 @@ func main() {
 }
 ```
 
-We have a normal `while` syntax.
+You can use normal `while` syntax.
 ```
 func main() {
     a = 10;
@@ -103,7 +130,7 @@ func main() {
 }
 ```
 
-Note that we can use `break` and `continue` in loops.
+Note that you can use `break` and `continue` in `for` and `while` loops.
 ```
 func main() {
     for(i in 0..9) {
@@ -119,7 +146,7 @@ func main() {
 
 ### Branches
 
-We can make branches by `if` - `else if` - `else` syntax.
+You can make branches by `if` - `else if` - `else` syntax.
 ```
 func main() {
     a = foo();
@@ -140,6 +167,7 @@ func foo() {
 ### Arrays
 
 An array element has a key, and the key must be one of integer, floating point and string.
+Keys of integer, floating point and string can be mixed.
 
 To create an array, assign a value with `[]` syntax.
 ```
@@ -172,7 +200,7 @@ WMS have Foreign Function Interface (FFI).
 You can register C functions to WMS runtime as FFI functions,
 then you can call them inside WMS code.
 
-The CLI includes `hello()` FFI function.
+The CLI includes `hello()` FFI function to show example.
 ```
 func main() {
     arg["hello"] = "hello";
@@ -183,4 +211,4 @@ func main() {
 `hello()` FFI function changes the value of `arg["hello"]` to `"bonjour"`.
 
 Thus, FFI function can accept only one array as an argument and can modify the contents of the array.
-More precisely, the elements of this array must have string keys and string values.
+More precisely, the elements of this array must have string keys and string values (currently).
