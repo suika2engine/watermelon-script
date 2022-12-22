@@ -10,6 +10,10 @@
 #include <assert.h>
 #include "wms_core.h"
 
+#ifdef _MSC_VER
+#define strdup _strdup
+#endif
+
 #define NEVER_COME_HERE		(0)
 #define UNIMPLEMENTED		(0)
 
@@ -676,7 +680,7 @@ wms_make_expr_with_neg(
 	struct wms_expr *e;
 
 	e = malloc(sizeof(struct wms_expr));
-	AST_MEM_CHECK(expr);
+	AST_MEM_CHECK(e);
 	memset(e, 0, sizeof(struct wms_expr));
 	e->type.is_neg = 1;
 	e->val.expr[0] = expr;
@@ -2078,6 +2082,7 @@ do_call(
 
 	/* Search for string variables. */
 	var = rt->frame->var_list;
+	func_name = term->val.call.func;
 	while (var != NULL) {
 		if (var->val.type.is_str &&
 		    strcmp(var->name, term->val.call.func) == 0) {
@@ -2086,8 +2091,6 @@ do_call(
 		}
 		var = var->next;
 	}
-	if (var == NULL)
-		func_name = term->val.call.func;
 
 	/* Search for user defined functions. */
 	func = rt->func_list->list;

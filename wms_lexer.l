@@ -3,8 +3,14 @@
  * Watermelon Script
  * Copyright (c) 2022, Keiichi Tabata. All rights reserved.
  */
+
 #include "wms_parser.tab.h"
 #include "wms_core.h"
+
+#ifdef _MSC_VER
+#define strdup _strdup
+#define fileno _fileno
+#endif
 
 #define YY_NO_INPUT
 #define YY_NO_UNPUT
