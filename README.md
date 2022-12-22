@@ -194,6 +194,18 @@ func main() {
 }
 ```
 
+### Conversions
+
+Integer to string.
+```
+   s = "" + 123;
+```
+
+String to integer.
+```
+   i = 0 + "123";
+```
+
 ### Calling C Functions
 
 WMS have Foreign Function Interface (FFI).
