@@ -2046,6 +2046,8 @@ do_call(
 {
 	struct wms_func *func;
 	struct wms_ffi_func *ffi_func;
+	struct wms_variable *var;
+	const char *func_name;
 	struct wms_value in_out;
 	int i;
 
@@ -2074,13 +2076,27 @@ do_call(
 		ffi_func = ffi_func->next;
 	}
 
+	/* Search for string variables. */
+	var = rt->frame->var_list;
+	while (var != NULL) {
+		if (var->val.type.is_str &&
+		    strcmp(var->name, term->val.call.func) == 0) {
+			func_name = get_str(rt, var->val.val.s_index);
+			break;
+		}
+		var = var->next;
+	}
+	if (var == NULL)
+		func_name = term->val.call.func;
+
 	/* Search for user defined functions. */
 	func = rt->func_list->list;
 	while (func != NULL) {
-		if (strcmp(func->name, term->val.call.func) == 0)
+		if (strcmp(func->name, func_name) == 0)
 			return eval_func(rt, func, term->val.call.arg_list, val);
 		func = func->next;
 	}
+
 	return rterror(rt, "Function %s is not defined", term->val.call.func);
 }
 
