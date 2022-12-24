@@ -234,12 +234,7 @@ and you can call them inside the WMS code.
 The CLI includes `hello()` FFI function to show example.
 ```
 func main() {
-    arg["hello"] = "hello";
-    hello(arg);
-    print(arg["hello"]);
+    a = hello();
+    print(a["hello"]);
 }
 ```
-`hello()` FFI function changes the value of `arg["hello"]` to `"bonjour"`.
-
-Thus, FFI function can accept only one array as an argument and can modify the contents of the array.
-More precisely, the elements of this array must have string keys and string values (currently).

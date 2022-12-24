@@ -77,12 +77,13 @@ static bool calc_div(struct wms_runtime *rt, struct wms_value val1, struct wms_v
 static bool calc_neg(struct wms_runtime *rt, struct wms_value val, struct wms_value *result);
 static bool eval_term(struct wms_runtime *rt, struct wms_term *term, struct wms_value *val);
 static bool do_call(struct wms_runtime *rt, struct wms_term *term, struct wms_value *val);
+static bool call_ffi_func(struct wms_runtime *rt, struct wms_ffi_func *ffi_func, struct wms_arg_list *arg_list, struct wms_value *result);
 static struct wms_value value_by_int(int i);
 static struct wms_value value_by_float(double f);
 static bool value_by_str(struct wms_runtime *rt, struct wms_value *val, const char *s);
 static int alloc_str_index(struct wms_runtime *rt);
 static int alloc_elem_index(struct wms_runtime *rt, bool is_head);
-static bool push_args(struct wms_runtime *rt, const struct wms_func *func, const struct wms_arg_list *arg_list);
+static bool push_args(struct wms_runtime *rt, const struct wms_param_list *param_list, const struct wms_arg_list *arg_list);
 static bool pop_return(struct wms_runtime *rt, struct wms_value *val);
 static bool put_scalar_value(struct wms_runtime *rt, const char *symbol, struct wms_value val);
 static bool put_array_elem_value(struct wms_runtime *rt, const char *symbol, struct wms_value index, struct wms_value val);
@@ -94,9 +95,13 @@ static struct wms_array_elem *get_array_head(struct wms_runtime *rt, int a_index
 static const char *get_str(struct wms_runtime *rt, int s_index);
 static void increment_str_ref(struct wms_runtime *rt, int s_index);
 static void decrement_str_ref(struct wms_runtime *rt, int s_index);
+static void set_str_return_value_ref(struct wms_runtime *rt, int s_index);
+static void reset_str_return_value_ref(struct wms_runtime *rt, int s_index);
 static void increment_array_ref(struct wms_runtime *rt, int a_index);
 static void decrement_array_ref(struct wms_runtime *rt, int a_index);
+static void set_array_return_value_ref(struct wms_runtime *rt, int a_index);
 static void print_value(struct wms_runtime *rt, struct wms_value val, bool quote);
+static bool register_ffi_func(struct wms_runtime *rt, wms_ffi_func_ptr func_ptr, const char *func_name, const char *param_name[]);
 static void out_of_memory(void);
 static bool rterror(struct wms_runtime *rt, const char *msg, ...);
 
@@ -1051,7 +1056,9 @@ free_variable(
 {
 	if (var->next != NULL)
 		free_variable(rt, var->next);
-	if (var->val.type.is_array)
+	if (var->val.type.is_str)
+		decrement_str_ref(rt, var->val.val.s_index);
+	else if (var->val.type.is_array)
 		decrement_array_ref(rt, var->val.val.a_index);
 	free(var);
 }
@@ -1065,6 +1072,9 @@ free_ffi_func(
 	if (ff->next)
 		free_ffi_func(ff->next);
 	free(ff->name);
+	if (ff->param_list->list != NULL)
+		free_param(ff->param_list->list);
+	free(ff->param_list);
 	free(ff);
 }
 
@@ -1105,7 +1115,7 @@ eval_func(
 	memset(frame, 0, sizeof(struct wms_frame));
 	frame->next = rt->frame;
 	rt->frame = frame;
-	if (!push_args(rt, func, arg_list))
+	if (!push_args(rt, func->param_list, arg_list))
 		return false;
 
 	/* Evaluate statements. */
@@ -1117,7 +1127,7 @@ eval_func(
 	if (cont)
 		return rterror(rt, "continue outside loop");
 
-	/* Get return variable. */
+	/* Get the return variable. */
 	if (!pop_return(rt, result))
 		return false;
 
@@ -1762,6 +1772,7 @@ calc_plus(
 			*result = value_by_int(
 					val1.val.i +
 					atoi(rt->str_pool[val2.val.s_index].s));
+			reset_str_return_value_ref(rt, val2.val.s_index);
 			return true;
 		} else if (val2.type.is_array) {
 			return rterror(rt, "Type error (int + array)");
@@ -1780,6 +1791,7 @@ calc_plus(
 			*result = value_by_float(
 					val1.val.f +
 					atof(rt->str_pool[val2.val.s_index].s));
+			reset_str_return_value_ref(rt, val2.val.s_index);
 			return true;
 		} else if (val2.type.is_array) {
 			return rterror(rt, "Type error (int + array)");
@@ -1787,14 +1799,17 @@ calc_plus(
 		assert(NEVER_COME_HERE);
 		return false;
 	} else if (val1.type.is_str) {
-		if (val2.type.is_int)
+		reset_str_return_value_ref(rt, val1.val.s_index);
+		if (val2.type.is_int) {
 			return calc_str_plus_int(rt, val1, val2, result);
-		else if (val2.type.is_float)
+		} else if (val2.type.is_float) {
 			return calc_str_plus_float(rt, val1, val2, result);
-		else if (val2.type.is_str)
+		} else if (val2.type.is_str) {
+			reset_str_return_value_ref(rt, val2.val.s_index);
 			return calc_str_plus_str(rt, val1, val2, result);
-		else if (val2.type.is_array)
+		} else if (val2.type.is_array) {
 			return rterror(rt, "Type error (str + array)");
+		}
 		assert(NEVER_COME_HERE);
 		return false;
 	} else if (val1.type.is_array) {
@@ -2052,7 +2067,6 @@ do_call(
 	struct wms_ffi_func *ffi_func;
 	struct wms_variable *var;
 	const char *func_name;
-	struct wms_value in_out;
 	int i;
 
 	assert(rt != NULL);
@@ -2068,15 +2082,8 @@ do_call(
 	/* Search for foreign functions. */
 	ffi_func = rt->ffi_func_list;
 	while (ffi_func != NULL) {
-		if (strcmp(ffi_func->name, term->val.call.func) == 0) {
-			if (term->val.call.arg_list == NULL)
-				return rterror(rt, "No argument for foreign function");
-			if (!eval_expr(rt, term->val.call.arg_list->list, &in_out))
-				return false;
-			if (!in_out.type.is_array)
-				return rterror(rt, "Foreign function argument is not an array");
-			return ffi_func->func(rt, &in_out);
-		}
+		if (strcmp(ffi_func->name, term->val.call.func) == 0)
+			return call_ffi_func(rt, ffi_func, term->val.call.arg_list, val);
 		ffi_func = ffi_func->next;
 	}
 
@@ -2101,6 +2108,41 @@ do_call(
 	}
 
 	return rterror(rt, "Function %s is not defined", term->val.call.func);
+}
+
+static bool
+call_ffi_func(
+	struct wms_runtime *rt,
+	struct wms_ffi_func *ffi_func,
+	struct wms_arg_list *arg_list,
+	struct wms_value *result)
+{
+	struct wms_frame *frame;
+
+	/* Prepare frame. */
+	frame = malloc(sizeof(struct wms_frame));
+	RT_MEM_CHECK(frame);
+	memset(frame, 0, sizeof(struct wms_frame));
+	frame->next = rt->frame;
+	rt->frame = frame;
+	if (!push_args(rt, ffi_func->param_list, arg_list))
+		return false;
+
+	/* Call. */
+	if (!ffi_func->func(rt))
+		return rterror(rt, "FFI function returned error");
+
+	/* Get the return variable. */
+	if (!pop_return(rt, result))
+		return false;
+
+	/* Destroy frame */
+	frame = rt->frame;
+	rt->frame = rt->frame->next;
+	frame->next = NULL;
+	free_frame(rt, frame);
+
+	return true;
 }
 
 static struct wms_value
@@ -2192,7 +2234,7 @@ alloc_elem_index(
 static bool
 push_args(
 	struct wms_runtime *rt,
-	const struct wms_func *func,
+	const struct wms_param_list *param_list,
 	const struct wms_arg_list *arg_list)
 {
 	struct wms_expr *expr;
@@ -2202,15 +2244,14 @@ push_args(
 
 	assert(rt != NULL);
 	assert(rt->frame != NULL);
-	assert(func != NULL);
 
 	if (arg_list == NULL)
 		return true;
-	if (func->param_list == NULL)
+	if (param_list == NULL)
 		return true;
 
 	expr = arg_list->list;
-	param = func->param_list->list;
+	param = param_list->list;
 	while (expr != NULL && param != NULL) {
 		/* We'll temporarily use the caller's frame to evaluation. */
 		frame = rt->frame;
@@ -2247,6 +2288,12 @@ pop_return(
 	while (var != NULL) {
 		if (strcmp(var->name, "__return") == 0) {
 			*val = var->val;
+
+			/* Set a temporary reference flag. */
+			if (var->val.type.is_str)
+				set_str_return_value_ref(rt, var->val.val.s_index);
+			else if (var->val.type.is_array)
+				set_array_return_value_ref(rt, var->val.val.a_index);
 			return true;
 		}
 		var = var->next;
@@ -2504,6 +2551,7 @@ increment_str_ref(
 	assert(rt->str_pool[s_index].is_used);
 	assert(rt->str_pool[s_index].ref > 0);
 	rt->str_pool[s_index].ref++;
+	rt->str_pool[s_index].ret_ref = false;
 }
 
 static void
@@ -2524,13 +2572,35 @@ decrement_str_ref(
 }
 
 static void
+set_str_return_value_ref(
+	struct wms_runtime *rt,
+	int s_index)
+{
+	assert(rt->str_pool[s_index].is_used);
+	rt->str_pool[s_index].ret_ref = true;
+}
+
+static void
+reset_str_return_value_ref(
+	struct wms_runtime *rt,
+	int s_index)
+{
+	assert(rt->str_pool[s_index].is_used);
+	rt->str_pool[s_index].ret_ref = false;
+}
+
+static void
 increment_array_ref(
 	struct wms_runtime *rt,
 	int a_index)
 {
 	assert(rt->elem_pool[a_index].is_used);
-	assert(rt->elem_pool[a_index].ref > 0);
+
+	/* ref==0 is possible when the array is referenced by a return value. */
+	assert(rt->elem_pool[a_index].ref >= 0);
+
 	rt->elem_pool[a_index].ref++;
+	rt->elem_pool[a_index].ret_ref = false;
 }
 
 static void
@@ -2545,6 +2615,8 @@ decrement_array_ref(
 	rt->elem_pool[a_index].ref--;
 	if (rt->elem_pool[a_index].ref > 0)
 		return;
+	if (rt->elem_pool[a_index].ret_ref)
+		return;
 
 	/* GC */
 	elem = get_array_head(rt, a_index);
@@ -2558,6 +2630,17 @@ decrement_array_ref(
 		}
 		elem = elem->next;
 	}
+}
+
+static void
+set_array_return_value_ref(
+	struct wms_runtime *rt,
+	int a_index)
+{
+	assert(rt != NULL);
+	assert(rt->elem_pool[a_index].is_used);
+
+	rt->elem_pool[a_index].ret_ref = true;
 }
 
 /*
@@ -2825,99 +2908,296 @@ intrinsic_isarray(struct wms_runtime *rt, struct wms_arg_list *arg_list, struct 
  */
 
 bool
-wms_register_ffi_func(
+wms_register_ffi_func_tbl(
 	struct wms_runtime *rt,
-	const char *name,
-	wms_ffi_func_ptr func)
+	struct wms_ffi_func_tbl *ffi_func_tbl,
+	int count)
+{
+	int i;
+
+	for (i = 0; i < count; i++) {
+		if (!register_ffi_func(rt,
+				       ffi_func_tbl[i].func_ptr,
+				       ffi_func_tbl[i].func_name,
+				       ffi_func_tbl[i].param_name))
+			return false;
+	}
+	return true;
+}
+
+static bool
+register_ffi_func(
+	struct wms_runtime *rt,
+	wms_ffi_func_ptr func_ptr,
+	const char *func_name,
+	const char *param_name[])
 {
 	struct wms_ffi_func *ff;
-
+	struct wms_param *param, *prev_param;
+	int i;
 	assert(rt != NULL);
 
 	ff = malloc(sizeof(struct wms_ffi_func));
 	RT_MEM_CHECK(ff);
-	ff->name = strdup(name);
+	ff->func = func_ptr;
+	ff->name = strdup(func_name);
 	RT_MEM_CHECK(ff->name);
-	ff->func = func;
+	ff->param_list = malloc(sizeof(struct wms_param_list));
+	RT_MEM_CHECK(ff->param_list);
+	memset(ff->param_list, 0, sizeof(struct wms_param_list));
+	i = 0;
+	prev_param = NULL;
+	while (param_name[i] != NULL) {
+		param = malloc(sizeof(struct wms_param));
+		RT_MEM_CHECK(param);
+		memset(param, 0, sizeof(struct wms_param));
+		param->symbol = strdup(param_name[i]);
+		RT_MEM_CHECK(param->symbol);
+		if (prev_param == NULL) {
+			ff->param_list->list = param;
+			prev_param = param;
+		} else {
+			prev_param->next = param;
+			prev_param = param;
+		}
+		i++;
+	}
 	ff->next = rt->ffi_func_list;
 	rt->ffi_func_list = ff;
 	return true;
 }
 
-const char *
-wms_get_ffi_arg_value(
+struct wms_value *
+wms_get_argument(
 	struct wms_runtime *rt,
-	struct wms_value *arg,
-	const char *key)
+	const char *param_name)
 {
-	struct wms_array_elem *elem;
-	const char *s;
+	struct wms_variable *var;
 
 	assert(rt != NULL);
-	assert(arg != NULL);
-	assert(arg->type.is_array);
-	assert(key != NULL);
+	assert(param_name != NULL);
 
-	elem = get_array_head(rt, arg->val.a_index)->next;
+	/* Search for the variable. */
+	var = rt->frame->var_list;
+	while (var != NULL) {
+		if (strcmp(var->name, param_name) == 0) {
+			/* Found. */
+			return &var->val;
+		}
+		var = var->next;
+	}
+
+	/* Not found. */
+	return false;
+}
+
+bool
+wms_is_int(
+	struct wms_runtime *rt,
+	struct wms_value *val)
+{
+	(void)rt;
+	assert(val != NULL);
+	return val->type.is_int;
+}
+
+bool
+wms_is_float(
+	struct wms_runtime *rt,
+	struct wms_value *val)
+{
+	(void)rt;
+	assert(val != NULL);
+	return val->type.is_float;
+}
+
+bool
+wms_is_str(
+	struct wms_runtime *rt,
+	struct wms_value *val)
+{
+	(void)rt;
+	assert(val != NULL);
+	return val->type.is_str;
+}
+
+bool
+wms_is_array(
+	struct wms_runtime *rt,
+	struct wms_value *val)
+{
+	(void)rt;
+	assert(val != NULL);
+	return val->type.is_array;
+}
+
+bool
+wms_get_int_value(
+	struct wms_runtime *rt,
+	struct wms_value *val,
+	int *ret)
+{
+	assert(rt != NULL);
+	assert(val != NULL);
+	assert(val->type.is_int);
+	assert(ret != NULL);
+	
+	*ret = val->val.i;
+	return true;
+}
+
+bool
+wms_get_float_value(
+	struct wms_runtime *rt,
+	struct wms_value *val,
+	double *ret)
+{
+	assert(rt != NULL);
+	assert(val != NULL);
+	assert(val->type.is_float);
+	assert(ret != NULL);
+	
+	*ret = val->val.f;
+	return true;
+}
+
+bool
+wms_get_str_value(
+	struct wms_runtime *rt,
+	struct wms_value *val,
+	const char **ret)
+{
+	assert(rt != NULL);
+	assert(val != NULL);
+	assert(val->type.is_str);
+	assert(ret != NULL);
+	
+	*ret = get_str(rt, val->val.s_index);
+	return true;
+}
+
+struct wms_value *
+wms_get_array_element_by_int(
+	struct wms_runtime *rt,
+	struct wms_value *val,
+	int key)
+{
+	struct wms_array_elem *elem;
+
+	assert(rt != NULL);
+	assert(val != NULL);
+
+	elem = get_array_head(rt, val->val.a_index)->next;
 	while (elem != NULL) {
-		if (!elem->index.type.is_str)
+		if (!elem->index.type.is_int)
 			continue;
-		s = get_str(rt, elem->index.val.s_index);
-		if (strcmp(s, key) == 0) {
-			if (!elem->val.type.is_str) {
-				rterror(rt, "Non string value");
-				return NULL;
-			}
-			return get_str(rt, elem->val.val.s_index);
+		if (elem->index.val.i == key) {
+			/* Key found. */
+			return &elem->val;
 		}
 		elem = elem->next;
 	}
-	rterror(rt, "Index %s is not defied for argument", key);
+
+	/* Key not found. */
 	return NULL;
 }
 
-/* Set value for key to foreign function argument.  */
-bool
-wms_set_ffi_arg_value(
+struct wms_value *
+wms_get_array_element_by_float(
 	struct wms_runtime *rt,
-	struct wms_value *arg,
-	const char *key,
-	const char *val)
+	struct wms_value *val,
+	double key)
 {
-	struct wms_array_elem *elem, *head;
-	int new_index;
+	struct wms_array_elem *elem;
 
 	assert(rt != NULL);
-	assert(arg != NULL);
-	assert(arg->type.is_array);
-	assert(key != NULL);
+	assert(val != NULL);
 
-	/* Find an element. */
-	head = get_array_head(rt, arg->val.a_index);
-	elem = head->next;
+	elem = get_array_head(rt, val->val.a_index)->next;
+	while (elem != NULL) {
+		if (!elem->index.type.is_float)
+			continue;
+		if (elem->index.val.f == key) {
+			/* Key found. */
+			return &elem->val;
+		}
+		elem = elem->next;
+	}
+
+	/* Key not found. */
+	return NULL;
+}
+
+struct wms_value *
+wms_get_array_element_by_str(
+	struct wms_runtime *rt,
+	struct wms_value *val,
+	const char *key)
+{
+	struct wms_array_elem *elem;
+
+	assert(rt != NULL);
+	assert(val != NULL);
+
+	elem = get_array_head(rt, val->val.a_index)->next;
 	while (elem != NULL) {
 		if (!elem->index.type.is_str)
 			continue;
 		if (strcmp(get_str(rt, elem->index.val.s_index), key) == 0) {
-			if (elem->val.type.is_array)
-				decrement_array_ref(rt, elem->val.val.a_index);
-			return value_by_str(rt, &elem->val, val);
+			/* Key found. */
+			return &elem->val;
 		}
 		elem = elem->next;
 	}
 
-	/* Create an array element. */
-	new_index = alloc_elem_index(rt, false);
-	if (new_index == -1)
+	/* Key not found. */
+	return NULL;
+}
+
+bool
+wms_set_int_return_value(
+	struct wms_runtime *rt,
+	int val)
+{
+	return put_scalar_value(rt, "__return", value_by_int(val));
+}
+
+bool
+wms_set_float_return_value(
+	struct wms_runtime *rt,
+	double val)
+{
+	return put_scalar_value(rt, "__return", value_by_float(val));
+}
+
+bool
+wms_set_str_return_value(
+	struct wms_runtime *rt,
+	const char *val)
+{
+	struct wms_value v;
+
+	if (!value_by_str(rt, &v, val))
 		return false;
-	elem = &rt->elem_pool[new_index];
-	if (!value_by_str(rt, &elem->index, key))
+
+	return put_scalar_value(rt, "__return", v);
+}
+
+/* We only suport string key and string value for now. */
+bool
+wms_set_array_return_value(
+	struct wms_runtime *rt,
+	const char *key,
+	const char *val)
+{
+	struct wms_value elem_index, elem_val;
+
+	if (!value_by_str(rt, &elem_index, key))
 		return false;
-	if (!value_by_str(rt, &elem->val, val))
+	if (!value_by_str(rt, &elem_val, val))
 		return false;
-	elem->next = head->next;
-	head->next = elem;
-	return true;
+
+	return put_array_elem_value(rt, "__return", elem_index, elem_val);
 }
 
 /*

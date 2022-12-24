@@ -7,4 +7,5 @@ for f in testcases/*.scr; do
     valgrind --leak-check=full --error-exitcode=1 ./wms $f
 done
 
+echo ''
 echo 'All tests are passed!'

@@ -227,13 +227,24 @@ struct wms_value {
 
 struct wms_str_elem {
 	bool is_used;
+
+	/* Reference count for variable references. */
 	int ref;
+
+	/* Temporary reference flag for return value. */
+	bool ret_ref;
+
 	char *s;
 };
 
 struct wms_array_elem {
 	bool is_used;
+
+	/* Reference count for variable references. */
 	int ref;
+
+	/* Temporary reference flag for return value. */
+	bool ret_ref;
 
 	/* Top nodes are used for dummy heads. */
 	bool is_head;
@@ -258,8 +269,9 @@ struct wms_frame {
 };
 
 struct wms_ffi_func {
-	char *name;
 	wms_ffi_func_ptr func;
+	char *name;
+	struct wms_param_list *param_list;
 
 	struct wms_ffi_func *next;
 };

@@ -12,7 +12,11 @@
 
 char script[MAX_SCRIPT_SIZE];
 
-static bool WMSAPI hello(struct wms_runtime *rt, struct wms_value *arg);
+static bool hello(struct wms_runtime *rt);
+
+struct wms_ffi_func_tbl ffi_func_tbl[] = {
+	{hello, "hello", {"a", "b", "c", "d", NULL}},
+};
 
 int main(int argc, char *argv[])
 {
@@ -50,7 +54,7 @@ int main(int argc, char *argv[])
 	}
 
 	/* Register foreign function. (hello()) */
-	if (!wms_register_ffi_func(rt, "hello", hello)) {
+	if (!wms_register_ffi_func_tbl(rt, ffi_func_tbl, 1)) {
 		fprintf(stderr, "%s.\n", wms_get_runtime_error_message(rt));
 		return 1;
 	}
@@ -70,11 +74,46 @@ int main(int argc, char *argv[])
 }
 
 /* Foreign function example. */
-static bool WMSAPI hello(struct wms_runtime *rt, struct wms_value *arg)
+static bool hello(struct wms_runtime *rt)
 {
+	struct wms_value *a, *b, *c, *d, *elem;
+	int a_i;
+	double b_f;
+	const char *c_s;
+	const char *d_s;
+
 	assert(rt != NULL);
 
-	wms_set_ffi_arg_value(rt, arg, "hello", "bonjour");
+	/* Get the argument pointers. */
+	a = wms_get_argument(rt, "a");
+	b = wms_get_argument(rt, "b");
+	c = wms_get_argument(rt, "c");
+	d = wms_get_argument(rt, "d");
+	if (a == NULL || b == NULL || c == NULL || d == NULL)
+		return false;
+
+	/* Get the argument values.. */
+	if (!wms_get_int_value(rt, a, &a_i))
+		return false;
+	if (!wms_get_float_value(rt, b, &b_f))
+		return false;
+	if (!wms_get_str_value(rt, c, &c_s))
+		return false;
+	elem = wms_get_array_element_by_str(rt, d, "hello");
+	if (elem == NULL)
+		return false;
+	if (!wms_get_str_value(rt, elem, &d_s))
+		return false;
+
+	/* Print the values. */
+	printf("In FFI hello(): got a = %d\n", a_i);
+	printf("In FFI hello(): got b = %f\n", b_f);
+	printf("In FFI hello(): got c = %s\n", c_s);
+	printf("In FFI hello(): got d[\"hello\"] = %s\n", d_s);
+
+	/* Set the return value. */
+	if (!wms_set_array_return_value(rt, "hello", "bonjour"))
+		return false;
 
 	return true;
 }

@@ -38,28 +38,50 @@ const char *wms_get_runtime_error_message(struct wms_runtime *rt);
 /* Cleanup runtime. */
 void wms_free_runtime(struct wms_runtime *rt);
 
-/* Must be implemented by main code. */
+/* Must be implemented by the main code. */
 int wms_printf(const char *s, ...);
 
 /*
  * Foreign Function Interface
  */
 
-#define WMSAPI
-
-/* Argument type. */
+/* Value type. */
 struct wms_value;
 
 /* Pointer to foreign function. */
-typedef bool WMSAPI (*wms_ffi_func_ptr)(struct wms_runtime *rt, struct wms_value *arg);
+typedef bool (*wms_ffi_func_ptr)(struct wms_runtime *rt);
 
-/* Register foreign function. */
-bool wms_register_ffi_func(struct wms_runtime *rt, const char *name, wms_ffi_func_ptr func);
+/* FFI function table. */
+struct wms_ffi_func_tbl {
+	wms_ffi_func_ptr func_ptr;
+	const char *func_name;
+	const char *param_name[16];
+};
 
-/* Get value for key from foreign function argument.  */
-const char *wms_get_ffi_arg_value(struct wms_runtime *rt, struct wms_value *arg, const char *key);
+/* Register a foreign function. */
+bool wms_register_ffi_func_tbl(struct wms_runtime *rt, struct wms_ffi_func_tbl *ffi_func_tbl, int count);
 
-/* Set value for key to foreign function argument.  */
-bool wms_set_ffi_arg_value(struct wms_runtime *rt, struct wms_value *arg, const char *key, const char *val);
+/* Get the argument of an FFI function. */
+struct wms_value *wms_get_argument(struct wms_runtime *rt, const char *param_name);
+
+/* Get the type of `struct wms_value`. */
+bool wms_is_int(struct wms_runtime *rt, struct wms_value *val);
+bool wms_is_float(struct wms_runtime *rt, struct wms_value *val);
+bool wms_is_str(struct wms_runtime *rt, struct wms_value *val);
+bool wms_is_array(struct wms_runtime *rt, struct wms_value *val);
+
+/* Get the value of `struct wms_value`. */
+bool wms_get_int_value(struct wms_runtime *rt, struct wms_value *val, int *ret);
+bool wms_get_float_value(struct wms_runtime *rt, struct wms_value *val, double *ret);
+bool wms_get_str_value(struct wms_runtime *rt, struct wms_value *val, const char **ret);
+struct wms_value *wms_get_array_element_by_int(struct wms_runtime *rt, struct wms_value *val, int key);
+struct wms_value *wms_get_array_element_by_float(struct wms_runtime *rt, struct wms_value *val, double key);
+struct wms_value *wms_get_array_element_by_str(struct wms_runtime *rt, struct wms_value *val, const char *key);
+
+/* Set the return value. */
+bool wms_set_int_return_value(struct wms_runtime *rt, int val);
+bool wms_set_float_return_value(struct wms_runtime *rt, double val);
+bool wms_set_str_return_value(struct wms_runtime *rt, const char *val);
+bool wms_set_array_return_value(struct wms_runtime *rt, const char *key, const char *val);
 
 #endif
