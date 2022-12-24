@@ -48,6 +48,9 @@ int wms_printf(const char *s, ...);
 /* Value type. */
 struct wms_value;
 
+/* Array element type. */
+struct wms_array_element;
+
 /* Pointer to foreign function. */
 typedef bool (*wms_ffi_func_ptr)(struct wms_runtime *rt);
 
@@ -61,8 +64,8 @@ struct wms_ffi_func_tbl {
 /* Register a foreign function. */
 bool wms_register_ffi_func_tbl(struct wms_runtime *rt, struct wms_ffi_func_tbl *ffi_func_tbl, int count);
 
-/* Get the argument of an FFI function. */
-struct wms_value *wms_get_argument(struct wms_runtime *rt, const char *param_name);
+/* Get the value of value. */
+bool wms_get_var_value(struct wms_runtime *rt, const char *symbol, struct wms_value **ret);
 
 /* Get the type of `struct wms_value`. */
 bool wms_is_int(struct wms_runtime *rt, struct wms_value *val);
@@ -74,14 +77,45 @@ bool wms_is_array(struct wms_runtime *rt, struct wms_value *val);
 bool wms_get_int_value(struct wms_runtime *rt, struct wms_value *val, int *ret);
 bool wms_get_float_value(struct wms_runtime *rt, struct wms_value *val, double *ret);
 bool wms_get_str_value(struct wms_runtime *rt, struct wms_value *val, const char **ret);
-struct wms_value *wms_get_array_element_by_int(struct wms_runtime *rt, struct wms_value *val, int key);
-struct wms_value *wms_get_array_element_by_float(struct wms_runtime *rt, struct wms_value *val, double key);
-struct wms_value *wms_get_array_element_by_str(struct wms_runtime *rt, struct wms_value *val, const char *key);
 
-/* Set the return value. */
-bool wms_set_int_return_value(struct wms_runtime *rt, int val);
-bool wms_set_float_return_value(struct wms_runtime *rt, double val);
-bool wms_set_str_return_value(struct wms_runtime *rt, const char *val);
-bool wms_set_array_return_value(struct wms_runtime *rt, const char *key, const char *val);
+/* Array element traverse. */
+struct wms_array_elem *wms_get_first_array_elem(struct wms_runtime *rt, struct wms_value *array);
+struct wms_array_elem *wms_get_next_array_elem(struct wms_runtime *rt, struct wms_array_elem *prev);
+
+/* Set the value of a variable. */
+bool wms_make_int_var(struct wms_runtime *rt, const char *symbol, int val, struct wms_value **ret);
+bool wms_make_float_var(struct wms_runtime *rt, const char *symbol, double val, struct wms_value **ret);
+bool wms_make_str_var(struct wms_runtime *rt, const char *symbol, const char *val, struct wms_value **ret);
+bool wms_make_array_var(struct wms_runtime *rt, const char *symbol, struct wms_value **ret);
+
+/* Getters for array element. */
+bool wms_get_array_elem(struct wms_runtime *rt, struct wms_value *array, struct wms_value *index, struct wms_value **ret);
+bool wms_get_array_elem_by_int_for_int(struct wms_runtime *rt, struct wms_value *array, int index, int *ret);
+bool wms_get_array_elem_by_int_for_float(struct wms_runtime *rt, struct wms_value *array, int index, double *ret);
+bool wms_get_array_elem_by_int_for_str(struct wms_runtime *rt, struct wms_value *array, int index, const char **ret);
+bool wms_get_array_elem_by_int_for_array(struct wms_runtime *rt, struct wms_value *array, int index, struct wms_value **ret);
+bool wms_get_array_elem_by_float_for_int(struct wms_runtime *rt, struct wms_value *array, double index, int *ret);
+bool wms_get_array_elem_by_float_for_float(struct wms_runtime *rt, struct wms_value *array, double index, double *ret);
+bool wms_get_array_elem_by_float_for_str(struct wms_runtime *rt, struct wms_value *array, double index, const char **ret);
+bool wms_get_array_elem_by_float_for_array(struct wms_runtime *rt, struct wms_value *array, double index, struct wms_value **ret);
+bool wms_get_array_elem_by_str_for_int(struct wms_runtime *rt, struct wms_value *array, const char *index, int *ret);
+bool wms_get_array_elem_by_str_for_float(struct wms_runtime *rt, struct wms_value *array, const char *index, double *ret);
+bool wms_get_array_elem_by_str_for_str(struct wms_runtime *rt, struct wms_value *array, const char *index, const char **ret);
+bool wms_get_array_elem_by_str_for_array(struct wms_runtime *rt, struct wms_value *array, const char *index, struct wms_value **ret);
+
+/* Setters for array element. */
+bool wms_set_array_elem(struct wms_runtime *rt, struct wms_value *array, struct wms_value *index, struct wms_value *val);
+bool wms_set_array_elem_by_int_for_int(struct wms_runtime *rt, struct wms_value *array, int index, int val);
+bool wms_set_array_elem_by_int_for_float(struct wms_runtime *rt, struct wms_value *array, int index, double val);
+bool wms_set_array_elem_by_int_for_str(struct wms_runtime *rt, struct wms_value *array, int index, const char *val);
+bool wms_set_array_elem_by_int_for_array(struct wms_runtime *rt, struct wms_value *array, int index, struct wms_value *val);
+bool wms_set_array_elem_by_float_for_int(struct wms_runtime *rt, struct wms_value *array, double index, int val);
+bool wms_set_array_elem_by_float_for_float(struct wms_runtime *rt, struct wms_value *array, double index, double val);
+bool wms_set_array_elem_by_float_for_str(struct wms_runtime *rt, struct wms_value *array, double index, const char *val);
+bool wms_set_array_elem_by_float_for_array(struct wms_runtime *rt, struct wms_value *array, double index, struct wms_value *val);
+bool wms_set_array_elem_by_str_for_int(struct wms_runtime *rt, struct wms_value *array, const char *index, int val);
+bool wms_set_array_elem_by_str_for_float(struct wms_runtime *rt, struct wms_value *array, const char *index, double val);
+bool wms_set_array_elem_by_str_for_str(struct wms_runtime *rt, struct wms_value *array, const char *index, const char *val);
+bool wms_set_array_elem_by_str_for_array(struct wms_runtime *rt, struct wms_value *array, const char *index, struct wms_value *val);
 
 #endif

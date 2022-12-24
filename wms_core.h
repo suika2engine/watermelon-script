@@ -256,7 +256,7 @@ struct wms_array_elem {
 };
 
 struct wms_variable {
-	const char *name;
+	char *name;
 	struct wms_value val;
 
 	struct wms_variable *next;

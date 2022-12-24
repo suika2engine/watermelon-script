@@ -87,6 +87,7 @@ static bool push_args(struct wms_runtime *rt, const struct wms_param_list *param
 static bool pop_return(struct wms_runtime *rt, struct wms_value *val);
 static bool put_scalar_value(struct wms_runtime *rt, const char *symbol, struct wms_value val);
 static bool put_array_elem_value(struct wms_runtime *rt, const char *symbol, struct wms_value index, struct wms_value val);
+static bool put_array_elem_value_helper(struct wms_runtime *rt, struct wms_value array, struct wms_value index, struct wms_value val);
 static bool get_scalar_value(struct wms_runtime *rt, const char *symbol, struct wms_value *val);
 static bool get_array_elem_value(struct wms_runtime *rt, const char *symbol, struct wms_value index, struct wms_value *val);
 static int compare_values(struct wms_runtime *rt, struct wms_value val1, struct wms_value val2);
@@ -1060,6 +1061,7 @@ free_variable(
 		decrement_str_ref(rt, var->val.val.s_index);
 	else if (var->val.type.is_array)
 		decrement_array_ref(rt, var->val.val.a_index);
+	free(var->name);
 	free(var);
 }
 
@@ -2337,7 +2339,8 @@ put_scalar_value(
 	var = malloc(sizeof(struct wms_variable));
 	RT_MEM_CHECK(var);
 	memset(var, 0, sizeof(struct wms_variable));
-	var->name = symbol;
+	var->name = strdup(symbol);
+	RT_MEM_CHECK(var->name);
 	var->val = val;
 	var->next = rt->frame->var_list;
 	rt->frame->var_list = var;
@@ -2353,23 +2356,14 @@ put_array_elem_value(
 	struct wms_value val)
 {
 	struct wms_variable *var;
-	struct wms_array_elem *elem, *head;
-	int new_index;
 
 	assert(rt != NULL);
 	assert(rt->frame != NULL);
 	assert(symbol != NULL);
 
-	/* Increment reference count. */
-	if (val.type.is_array)
-		increment_array_ref(rt, val.val.a_index);
-	else if (val.type.is_str)
-		increment_str_ref(rt, val.val.s_index);
-
 	/* Find a variable. */
 	var = rt->frame->var_list;
 	while (var != NULL) {
-		assert(var->name != NULL);
 		if (strcmp(var->name, symbol) == 0)
 			break;
 		var = var->next;
@@ -2379,7 +2373,8 @@ put_array_elem_value(
 		var = malloc(sizeof(struct wms_variable));
 		RT_MEM_CHECK(var);
 		memset(var, 0, sizeof(struct wms_variable));
-		var->name = symbol;
+		var->name = strdup(symbol);
+		RT_MEM_CHECK(var->name);
 		var->val.type.is_array = 1;
 		var->val.val.a_index = alloc_elem_index(rt, true);
 		if (var->val.val.a_index == -1)
@@ -2397,12 +2392,37 @@ put_array_elem_value(
 			return false;
 	}
 
+	return put_array_elem_value_helper(rt, var->val, index, val);
+}
+
+static bool
+put_array_elem_value_helper(
+	struct wms_runtime *rt,
+	struct wms_value array,
+	struct wms_value index,
+	struct wms_value val)
+{
+	struct wms_array_elem *elem, *head;
+	int new_index;
+	
+	assert(rt != NULL);
+	assert(array.type.is_array);
+	assert(!index.type.is_array);
+
+	/* Increment reference count. */
+	if (val.type.is_str)
+		increment_str_ref(rt, val.val.s_index);
+	if (val.type.is_array)
+		increment_array_ref(rt, val.val.a_index);
+
 	/* Find an element. */
-	head = get_array_head(rt, var->val.val.a_index);
+	head = get_array_head(rt, array.val.a_index);
 	elem = head->next;
 	while (elem != NULL) {
 		if (compare_values(rt, elem->index, index) == 0) {
-			if (elem->val.type.is_array)
+			if (elem->val.type.is_str)
+				decrement_array_ref(rt, elem->val.val.a_index);
+			else if (elem->val.type.is_array)
 				decrement_array_ref(rt, elem->val.val.a_index);
 
 			/*  Assign an array element. */
@@ -2423,6 +2443,7 @@ put_array_elem_value(
 	head->next = elem;
 	return true;
 }
+
 
 static bool
 get_scalar_value(
@@ -2563,13 +2584,15 @@ decrement_str_ref(
 	assert(rt->str_pool[s_index].is_used);
 	assert(rt->str_pool[s_index].ref > 0);
 	rt->str_pool[s_index].ref--;
+	if (rt->str_pool[s_index].ref > 0)
+		return;
+	if (rt->str_pool[s_index].ret_ref)
+		return;
 
 	/* GC */
-	if (rt->str_pool[s_index].ref == 0) {
-		free(rt->str_pool[s_index].s);
-		rt->str_pool[s_index].s = NULL;
-		rt->str_pool[s_index].is_used = false;
-	}
+	free(rt->str_pool[s_index].s);
+	rt->str_pool[s_index].s = NULL;
+	rt->str_pool[s_index].is_used = false;
 }
 
 static void
@@ -2971,22 +2994,25 @@ register_ffi_func(
 	return true;
 }
 
-struct wms_value *
-wms_get_argument(
+bool
+wms_get_var_value(
 	struct wms_runtime *rt,
-	const char *param_name)
+	const char *symbol,
+	struct wms_value **ret)
 {
 	struct wms_variable *var;
 
 	assert(rt != NULL);
-	assert(param_name != NULL);
+	assert(symbol != NULL);
+	assert(ret != NULL);
 
 	/* Search for the variable. */
 	var = rt->frame->var_list;
 	while (var != NULL) {
-		if (strcmp(var->name, param_name) == 0) {
+		if (strcmp(var->name, symbol) == 0) {
 			/* Found. */
-			return &var->val;
+			*ret = &var->val;
+			return true;
 		}
 		var = var->next;
 	}
@@ -3080,128 +3106,567 @@ wms_get_str_value(
 	return true;
 }
 
-struct wms_value *
-wms_get_array_element_by_int(
+struct wms_array_elem *
+wms_get_first_array_elem(
 	struct wms_runtime *rt,
-	struct wms_value *val,
-	int key)
+	struct wms_value *array)
 {
-	struct wms_array_elem *elem;
-
 	assert(rt != NULL);
-	assert(val != NULL);
+	assert(array != NULL);
+	assert(array->type.is_array);
 
-	elem = get_array_head(rt, val->val.a_index)->next;
-	while (elem != NULL) {
-		if (!elem->index.type.is_int)
-			continue;
-		if (elem->index.val.i == key) {
-			/* Key found. */
-			return &elem->val;
-		}
-		elem = elem->next;
-	}
-
-	/* Key not found. */
-	return NULL;
+	return get_array_head(rt, array->val.a_index)->next;
 }
 
-struct wms_value *
-wms_get_array_element_by_float(
+struct wms_array_elem *
+wms_get_next_array_elem(
 	struct wms_runtime *rt,
-	struct wms_value *val,
-	double key)
+	struct wms_array_elem *prev)
 {
-	struct wms_array_elem *elem;
-
 	assert(rt != NULL);
-	assert(val != NULL);
+	assert(prev != NULL);
 
-	elem = get_array_head(rt, val->val.a_index)->next;
-	while (elem != NULL) {
-		if (!elem->index.type.is_float)
-			continue;
-		if (elem->index.val.f == key) {
-			/* Key found. */
-			return &elem->val;
-		}
-		elem = elem->next;
-	}
-
-	/* Key not found. */
-	return NULL;
-}
-
-struct wms_value *
-wms_get_array_element_by_str(
-	struct wms_runtime *rt,
-	struct wms_value *val,
-	const char *key)
-{
-	struct wms_array_elem *elem;
-
-	assert(rt != NULL);
-	assert(val != NULL);
-
-	elem = get_array_head(rt, val->val.a_index)->next;
-	while (elem != NULL) {
-		if (!elem->index.type.is_str)
-			continue;
-		if (strcmp(get_str(rt, elem->index.val.s_index), key) == 0) {
-			/* Key found. */
-			return &elem->val;
-		}
-		elem = elem->next;
-	}
-
-	/* Key not found. */
-	return NULL;
+	return prev->next;
 }
 
 bool
-wms_set_int_return_value(
+wms_make_int_var(
 	struct wms_runtime *rt,
-	int val)
+	const char *symbol,
+	int val,
+	struct wms_value **ret)
 {
-	return put_scalar_value(rt, "__return", value_by_int(val));
+	assert(rt != NULL);
+	assert(symbol != NULL);
+	assert(ret != NULL);
+
+	if (!put_scalar_value(rt, symbol, value_by_int(val)))
+		return false;
+	if (ret != NULL)
+		if (!get_scalar_value(rt, symbol, *ret))
+			return false;
+	return true;
 }
 
 bool
-wms_set_float_return_value(
+wms_make_float_var(
 	struct wms_runtime *rt,
-	double val)
+	const char *symbol,
+	double val,
+	struct wms_value **ret)
 {
-	return put_scalar_value(rt, "__return", value_by_float(val));
+	assert(rt != NULL);
+	assert(symbol != NULL);
+	assert(ret != NULL);
+
+	if (!put_scalar_value(rt, symbol, value_by_float(val)))
+		return false;
+	if (ret != NULL)
+		if (!get_scalar_value(rt, symbol, *ret))
+			return false;
+	return true;
 }
 
 bool
-wms_set_str_return_value(
+wms_make_str_var(
 	struct wms_runtime *rt,
-	const char *val)
+	const char *symbol,
+	const char *val,
+	struct wms_value **ret)
 {
 	struct wms_value v;
 
+	assert(rt != NULL);
+	assert(symbol != NULL);
+	assert(val != NULL);
+	assert(ret != NULL);
+
 	if (!value_by_str(rt, &v, val))
 		return false;
-
-	return put_scalar_value(rt, "__return", v);
+	if (!put_scalar_value(rt, symbol, v))
+		return false;
+	if (ret != NULL)
+		if (!get_scalar_value(rt, symbol, *ret))
+			return false;
+	return true;
 }
 
-/* We only suport string key and string value for now. */
 bool
-wms_set_array_return_value(
+wms_make_array_var(
 	struct wms_runtime *rt,
-	const char *key,
+	const char *symbol,
+	struct wms_value **ret)
+{
+	struct wms_value array;
+	struct wms_variable *var;
+
+	assert(rt != NULL);
+	assert(rt->frame != NULL);
+	assert(symbol != NULL);
+	assert(ret != NULL);
+
+	/* Create an empty array. */
+	memset(&array, 0, sizeof(struct wms_value));
+	array.type.is_array = 1;
+	array.val.a_index = alloc_elem_index(rt, true);
+	if (array.val.a_index == -1)
+		return false;
+	increment_array_ref(rt, array.val.a_index);
+
+	/* Find an existing variable. */
+	var = rt->frame->var_list;
+	while (var != NULL) {
+		assert(var->name != NULL);
+		if (strcmp(var->name, symbol) == 0) {
+			/* Found. */
+			if (var->val.type.is_str)
+				decrement_str_ref(rt, var->val.val.s_index);
+			else if (var->val.type.is_array)
+				decrement_array_ref(rt, var->val.val.a_index);
+			var->val = array;
+			*ret = &var->val;
+			return true;
+		}
+		var = var->next;
+	}
+
+	/* If not found, create a new variable. */
+	var = malloc(sizeof(struct wms_variable));
+	RT_MEM_CHECK(var);
+	memset(var, 0, sizeof(struct wms_variable));
+	var->name = strdup(symbol);
+	RT_MEM_CHECK(var->name);
+	var->val = array;
+	var->next = rt->frame->var_list;
+	rt->frame->var_list = var;
+	*ret = &var->val;
+	return true;
+}
+
+bool
+wms_get_array_elem(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	struct wms_value *index,
+	struct wms_value **ret)
+{
+	struct wms_array_elem *elem;
+
+	assert(rt != NULL);
+	assert(rt->frame != NULL);
+	assert(array != NULL);
+	assert(index != NULL);
+	assert(!index->type.is_array);
+	assert(ret != NULL);
+
+	elem = get_array_head(rt, array->val.a_index)->next;
+	while (elem != NULL) {
+		if (compare_values(rt, elem->index, *index) == 0) {
+			*ret = &elem->val;
+			return true;
+		}
+		elem = elem->next;
+	}
+	return false;
+}
+
+bool
+wms_get_array_elem_by_int_for_int(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	int index,
+	int *ret)
+{
+	struct wms_value v_index, *v_ret_ptr;
+
+	assert(rt != NULL);
+	assert(array != NULL);
+	assert(ret != NULL);
+
+	v_index = value_by_int(index);
+	if (!wms_get_array_elem(rt, array, &v_index, &v_ret_ptr))
+		return false;
+	if (!wms_get_int_value(rt, v_ret_ptr, ret))
+		return false;
+	return true;
+}
+
+bool
+wms_get_array_elem_by_int_for_float(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	int index,
+	double *ret)
+{
+	struct wms_value v_index, *v_ret_ptr;
+
+	assert(rt != NULL);
+	assert(array != NULL);
+	assert(ret != NULL);
+
+	v_index = value_by_int(index);
+	if (!wms_get_array_elem(rt, array, &v_index, &v_ret_ptr))
+		return false;
+	if (!wms_get_float_value(rt, v_ret_ptr, ret))
+		return false;
+	return true;
+}
+
+bool
+wms_get_array_elem_by_int_for_str(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	int index,
+	const char **ret)
+{
+	struct wms_value v_index, *v_ret_ptr;
+
+	assert(rt != NULL);
+	assert(array != NULL);
+	assert(ret != NULL);
+
+	v_index = value_by_int(index);
+	if (!wms_get_array_elem(rt, array, &v_index, &v_ret_ptr))
+		return false;
+	if (!wms_get_str_value(rt, v_ret_ptr, ret))
+		return false;
+	return true;
+}
+
+bool
+wms_get_array_elem_by_int_for_array(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	int index,
+	struct wms_value **ret)
+{
+	struct wms_value v_index;
+
+	assert(rt != NULL);
+	assert(array != NULL);
+	assert(ret != NULL);
+
+	v_index = value_by_int(index);
+	if (!wms_get_array_elem(rt, array, &v_index, ret))
+		return false;
+	return true;
+}
+
+bool
+wms_get_array_elem_by_float_for_int(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	double index,
+	int *ret)
+{
+	struct wms_value v_index, *v_ret_ptr;
+
+	assert(rt != NULL);
+	assert(array != NULL);
+	assert(ret != NULL);
+
+	v_index = value_by_float(index);
+	if (!wms_get_array_elem(rt, array, &v_index, &v_ret_ptr))
+		return false;
+	if (!wms_get_int_value(rt, v_ret_ptr, ret))
+		return false;
+	return true;
+}
+
+bool
+wms_get_array_elem_by_float_for_float(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	double index,
+	double *ret)
+{
+	struct wms_value v_index, *v_ret_ptr;
+
+	assert(rt != NULL);
+	assert(array != NULL);
+	assert(ret != NULL);
+
+	v_index = value_by_float(index);
+	if (!wms_get_array_elem(rt, array, &v_index, &v_ret_ptr))
+		return false;
+	if (!wms_get_float_value(rt, v_ret_ptr, ret))
+		return false;
+	return true;
+}
+
+bool
+wms_get_array_elem_by_float_for_str(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	double index,
+	const char **ret)
+{
+	struct wms_value v_index, *v_ret_ptr;
+
+	assert(rt != NULL);
+	assert(array != NULL);
+	assert(ret != NULL);
+
+	v_index = value_by_float(index);
+	if (!wms_get_array_elem(rt, array, &v_index, &v_ret_ptr))
+		return false;
+	if (!wms_get_str_value(rt, v_ret_ptr, ret))
+		return false;
+	return true;
+}
+
+bool
+wms_get_array_elem_by_float_for_array(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	double index,
+	struct wms_value **ret)
+{
+	struct wms_value v_index;
+
+	assert(rt != NULL);
+	assert(array != NULL);
+	assert(ret != NULL);
+
+	v_index = value_by_float(index);
+	if (!wms_get_array_elem(rt, array, &v_index, ret))
+		return false;
+	return true;
+}
+
+bool
+wms_get_array_elem_by_str_for_int(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	const char *index,
+	int *ret)
+{
+	struct wms_value v_index, *v_ret_ptr;
+
+	assert(rt != NULL);
+	assert(array != NULL);
+	assert(ret != NULL);
+
+	if (!value_by_str(rt, &v_index, index))
+		return false;
+	if (!wms_get_array_elem(rt, array, &v_index, &v_ret_ptr))
+		return false;
+	if (!wms_get_int_value(rt, v_ret_ptr, ret))
+		return false;
+	return true;
+}
+
+bool
+wms_get_array_elem_by_str_for_float(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	const char *index,
+	double *ret)
+{
+	struct wms_value v_index, *v_ret_ptr;
+
+	assert(rt != NULL);
+	assert(array != NULL);
+	assert(ret != NULL);
+
+	if (!value_by_str(rt, &v_index, index))
+		return false;
+	if (!wms_get_array_elem(rt, array, &v_index, &v_ret_ptr))
+		return false;
+	if (!wms_get_float_value(rt, v_ret_ptr, ret))
+		return false;
+	return true;
+}
+
+bool
+wms_get_array_elem_by_str_for_str(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	const char *index,
+	const char **ret)
+{
+	struct wms_value v_index, *v_ret_ptr;
+
+	assert(rt != NULL);
+	assert(array != NULL);
+	assert(ret != NULL);
+
+	if (!value_by_str(rt, &v_index, index))
+		return false;
+	if (!wms_get_array_elem(rt, array, &v_index, &v_ret_ptr))
+		return false;
+	if (!wms_get_str_value(rt, v_ret_ptr, ret))
+		return false;
+	return true;
+}
+
+bool
+wms_get_array_elem_by_str_for_array(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	const char *index,
+	struct wms_value **ret)
+{
+	struct wms_value v_index;
+
+	assert(rt != NULL);
+	assert(array != NULL);
+	assert(ret != NULL);
+
+	if (!value_by_str(rt, &v_index, index))
+		return false;
+	if (!wms_get_array_elem(rt, array, &v_index, ret))
+		return false;
+	return true;
+}
+
+bool
+wms_set_array_elem(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	struct wms_value *index,
+	struct wms_value *val)
+{
+	assert(rt != NULL);
+	assert(rt->frame != NULL);
+	assert(array != NULL);
+	assert(array->type.is_array);
+	assert(index != NULL);
+	assert(!index->type.is_array);
+
+	return put_array_elem_value_helper(rt, *array, *index, *val);
+}
+
+bool
+wms_set_array_elem_by_int_for_int(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	int index,
+	int val)
+{
+	struct wms_value v_index, v_val;
+
+	v_index = value_by_int(index);
+	v_val = value_by_int(val);
+	return wms_set_array_elem(rt, array, &v_index, &v_val);
+}
+
+bool
+wms_set_array_elem_by_int_for_float(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	int index,
+	double val)
+{
+	struct wms_value v_index, v_val;
+
+	v_index = value_by_int(index);
+	v_val = value_by_float(val);
+	return wms_set_array_elem(rt, array, &v_index, &v_val);
+}
+
+bool
+wms_set_array_elem_by_int_for_str(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	int index,
 	const char *val)
 {
-	struct wms_value elem_index, elem_val;
+	struct wms_value v_index, v_val;
 
-	if (!value_by_str(rt, &elem_index, key))
+	v_index = value_by_int(index);
+	if (!value_by_str(rt, &v_val, val))
 		return false;
-	if (!value_by_str(rt, &elem_val, val))
-		return false;
+	return wms_set_array_elem(rt, array, &v_index, &v_val);
+}
 
-	return put_array_elem_value(rt, "__return", elem_index, elem_val);
+bool
+wms_set_array_elem_by_float_for_int(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	double index,
+	int val)
+{
+	struct wms_value v_index, v_val;
+
+	v_index = value_by_float(index);
+	v_val = value_by_int(val);
+	return wms_set_array_elem(rt, array, &v_index, &v_val);
+}
+
+bool
+wms_set_array_elem_by_float_for_float(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	double index,
+	double val)
+{
+	struct wms_value v_index, v_val;
+
+	v_index = value_by_float(index);
+	v_val = value_by_float(val);
+	return wms_set_array_elem(rt, array, &v_index, &v_val);
+}
+
+bool
+wms_set_array_elem_by_float_for_str(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	double index,
+	const char *val)
+{
+	struct wms_value v_index, v_val;
+
+	v_index = value_by_float(index);
+	if (!value_by_str(rt, &v_val, val))
+		return false;
+	return wms_set_array_elem(rt, array, &v_index, &v_val);
+}
+
+bool
+wms_set_array_elem_by_str_for_int(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	const char *index,
+	int val)
+{
+	struct wms_value v_index, v_val;
+
+	if (!value_by_str(rt, &v_index, index))
+		return false;
+	v_val = value_by_int(val);
+	return wms_set_array_elem(rt, array, &v_index, &v_val);
+}
+
+bool
+wms_set_array_elem_by_str_for_float(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	const char *index,
+	double val)
+{
+	struct wms_value v_index, v_val;
+
+	if (!value_by_str(rt, &v_index, index))
+		return false;
+	v_val = value_by_float(val);
+	return wms_set_array_elem(rt, array, &v_index, &v_val);
+}
+
+bool
+wms_set_array_elem_by_str_for_str(
+	struct wms_runtime *rt,
+	struct wms_value *array,
+	const char *index,
+	const char *val)
+{
+	struct wms_value v_index, v_val;
+
+	if (!value_by_str(rt, &v_index, index))
+		return false;
+	if (!value_by_str(rt, &v_val, val))
+		return false;
+	return wms_set_array_elem(rt, array, &v_index, &v_val);
 }
 
 /*

@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
 /* Foreign function example. */
 static bool hello(struct wms_runtime *rt)
 {
-	struct wms_value *a, *b, *c, *d, *elem;
+	struct wms_value *a, *b, *c, *d, *ret;
 	int a_i;
 	double b_f;
 	const char *c_s;
@@ -85,24 +85,23 @@ static bool hello(struct wms_runtime *rt)
 	assert(rt != NULL);
 
 	/* Get the argument pointers. */
-	a = wms_get_argument(rt, "a");
-	b = wms_get_argument(rt, "b");
-	c = wms_get_argument(rt, "c");
-	d = wms_get_argument(rt, "d");
-	if (a == NULL || b == NULL || c == NULL || d == NULL)
+	if (!wms_get_var_value(rt, "a", &a))
+		return false;
+	if (!wms_get_var_value(rt, "b", &b))
+		return false;
+	if (!wms_get_var_value(rt, "c", &c))
+		return false;
+	if (!wms_get_var_value(rt, "d", &d))
 		return false;
 
-	/* Get the argument values.. */
+	/* Get the argument values. */
 	if (!wms_get_int_value(rt, a, &a_i))
 		return false;
 	if (!wms_get_float_value(rt, b, &b_f))
 		return false;
 	if (!wms_get_str_value(rt, c, &c_s))
 		return false;
-	elem = wms_get_array_element_by_str(rt, d, "hello");
-	if (elem == NULL)
-		return false;
-	if (!wms_get_str_value(rt, elem, &d_s))
+	if (!wms_get_array_elem_by_str_for_str(rt, d, "hello", &d_s))
 		return false;
 
 	/* Print the values. */
@@ -112,7 +111,9 @@ static bool hello(struct wms_runtime *rt)
 	printf("In FFI hello(): got d[\"hello\"] = %s\n", d_s);
 
 	/* Set the return value. */
-	if (!wms_set_array_return_value(rt, "hello", "bonjour"))
+	if (!wms_make_array_var(rt, "__return", &ret))
+		return false;
+	if (!wms_set_array_elem_by_str_for_str(rt, ret, "hello", "bonjour"))
 		return false;
 
 	return true;
