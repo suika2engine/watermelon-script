@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 set -eu
 
@@ -10,4 +10,5 @@ for f in testcases/*.scr; do
     echo "passed."
 done
 
+echo ''
 echo 'All tests are passed!'

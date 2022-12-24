@@ -1072,9 +1072,10 @@ free_ffi_func(
 	if (ff->next)
 		free_ffi_func(ff->next);
 	free(ff->name);
-	if (ff->param_list->list != NULL)
+	if (ff->param_list != NULL) {
 		free_param(ff->param_list->list);
-	free(ff->param_list);
+		free(ff->param_list);
+	}
 	free(ff);
 }
 
@@ -2942,25 +2943,28 @@ register_ffi_func(
 	ff->func = func_ptr;
 	ff->name = strdup(func_name);
 	RT_MEM_CHECK(ff->name);
-	ff->param_list = malloc(sizeof(struct wms_param_list));
-	RT_MEM_CHECK(ff->param_list);
-	memset(ff->param_list, 0, sizeof(struct wms_param_list));
-	i = 0;
-	prev_param = NULL;
-	while (param_name[i] != NULL) {
-		param = malloc(sizeof(struct wms_param));
-		RT_MEM_CHECK(param);
-		memset(param, 0, sizeof(struct wms_param));
-		param->symbol = strdup(param_name[i]);
-		RT_MEM_CHECK(param->symbol);
-		if (prev_param == NULL) {
-			ff->param_list->list = param;
-			prev_param = param;
-		} else {
-			prev_param->next = param;
-			prev_param = param;
+	if (param_name[0] != NULL) {
+		ff->param_list = malloc(sizeof(struct wms_param_list));
+		RT_MEM_CHECK(ff->param_list);
+		memset(ff->param_list, 0, sizeof(struct wms_param_list));
+
+		i = 0;
+		prev_param = NULL;
+		while (param_name[i] != NULL) {
+			param = malloc(sizeof(struct wms_param));
+			RT_MEM_CHECK(param);
+			memset(param, 0, sizeof(struct wms_param));
+			param->symbol = strdup(param_name[i]);
+			RT_MEM_CHECK(param->symbol);
+			if (prev_param == NULL) {
+				ff->param_list->list = param;
+				prev_param = param;
+			} else {
+				prev_param->next = param;
+				prev_param = param;
+			}
+			i++;
 		}
-		i++;
 	}
 	ff->next = rt->ffi_func_list;
 	rt->ffi_func_list = ff;

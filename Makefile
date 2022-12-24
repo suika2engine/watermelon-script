@@ -1,5 +1,5 @@
 # cflags
-CFLAGS = -Wall -Werror -Wextra -Wundef -Wconversion
+CFLAGS = -Wall -Werror -Wextra -Wundef -Wno-sign-compare
 
 # testing binary
 wms: wms_parser.tab.c wms_lexer.yy.c wms_core.c main.c

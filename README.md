@@ -234,7 +234,8 @@ and you can call them inside the WMS code.
 The CLI includes `hello()` FFI function to show example.
 ```
 func main() {
-    a = hello();
+    array["hello"] = "hello";
+    a = hello(1, 3.14, "str", array);
     print(a["hello"]);
 }
 ```
