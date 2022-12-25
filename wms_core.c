@@ -74,6 +74,8 @@ static bool calc_str_plus_str(struct wms_runtime *rt, struct wms_value val1, str
 static bool calc_minus(struct wms_runtime *rt, struct wms_value val1, struct wms_value val2, struct wms_value *result);
 static bool calc_mul(struct wms_runtime *rt, struct wms_value val1, struct wms_value val2, struct wms_value *result);
 static bool calc_div(struct wms_runtime *rt, struct wms_value val1, struct wms_value val2, struct wms_value *result);
+static bool calc_and(struct wms_runtime *rt, struct wms_value val1, struct wms_value val2, struct wms_value *result);
+static bool calc_or(struct wms_runtime *rt, struct wms_value val1, struct wms_value val2, struct wms_value *result);
 static bool calc_neg(struct wms_runtime *rt, struct wms_value val, struct wms_value *result);
 static bool eval_term(struct wms_runtime *rt, struct wms_term *term, struct wms_value *val);
 static bool do_call(struct wms_runtime *rt, struct wms_term *term, struct wms_value *val);
@@ -682,6 +684,38 @@ wms_make_expr_with_div(
 }
 
 struct wms_expr *
+wms_make_expr_with_and(
+	struct wms_expr *expr1,
+	struct wms_expr *expr2)
+{
+	struct wms_expr *expr;
+
+	expr = malloc(sizeof(struct wms_expr));
+	AST_MEM_CHECK(expr);
+	memset(expr, 0, sizeof(struct wms_expr));
+	expr->type.is_and = 1;
+	expr->val.expr[0] = expr1;
+	expr->val.expr[1] = expr2;
+	return expr;
+}
+
+struct wms_expr *
+wms_make_expr_with_or(
+	struct wms_expr *expr1,
+	struct wms_expr *expr2)
+{
+	struct wms_expr *expr;
+
+	expr = malloc(sizeof(struct wms_expr));
+	AST_MEM_CHECK(expr);
+	memset(expr, 0, sizeof(struct wms_expr));
+	expr->type.is_or = 1;
+	expr->val.expr[0] = expr1;
+	expr->val.expr[1] = expr2;
+	return expr;
+}
+
+struct wms_expr *
 wms_make_expr_with_neg(
 	struct wms_expr *expr)
 {
@@ -933,7 +967,8 @@ free_expr(
 		   expr->type.is_gt || expr->type.is_gte ||
 		   expr->type.is_lt || expr->type.is_lte || expr->type.is_eq ||
 		   expr->type.is_plus || expr->type.is_minus ||
-		   expr->type.is_mul || expr->type.is_div) {
+		   expr->type.is_mul || expr->type.is_div ||
+		   expr->type.is_and || expr->type.is_or) {
 		free_expr(expr->val.expr[0]);
 		free_expr(expr->val.expr[1]);
 	} else if (expr->type.is_neg) {
@@ -1597,6 +1632,18 @@ eval_expr(
 		if (!eval_expr(rt, expr->val.expr[1], &val2))
 			return false;
 		return calc_div(rt, val1, val2, val);
+	} else if (expr->type.is_and) {
+		if (!eval_expr(rt, expr->val.expr[0], &val1))
+			return false;
+		if (!eval_expr(rt, expr->val.expr[1], &val2))
+			return false;
+		return calc_and(rt, val1, val2, val);
+	} else if (expr->type.is_or) {
+		if (!eval_expr(rt, expr->val.expr[0], &val1))
+			return false;
+		if (!eval_expr(rt, expr->val.expr[1], &val2))
+			return false;
+		return calc_or(rt, val1, val2, val);
 	} else if (expr->type.is_neg) {
 		if (!eval_expr(rt, expr->val.expr[0], &val1))
 			return false;
@@ -2009,6 +2056,50 @@ calc_div(
 		}
 	}
 	return rterror(rt, "Type error (divide operator)");
+}
+
+static bool
+calc_and(
+	struct wms_runtime *rt,
+	struct wms_value val1,
+	struct wms_value val2,
+	struct wms_value *result)
+{
+	assert(rt != NULL);
+	assert(result != NULL);
+
+	if (!val1.type.is_int || !val2.type.is_int)
+		return rterror(rt, "Non integer expression specified for && operator");
+
+	if (val1.val.i && val2.val.i) {
+		*result = value_by_int(1);
+		return true;
+	}
+
+	*result = value_by_int(0);
+	return true;
+}
+
+static bool
+calc_or(
+	struct wms_runtime *rt,
+	struct wms_value val1,
+	struct wms_value val2,
+	struct wms_value *result)
+{
+	assert(rt != NULL);
+	assert(result != NULL);
+
+	if (!val1.type.is_int || !val2.type.is_int)
+		return rterror(rt, "Non integer expression specified for || operator");
+
+	if (val1.val.i || val2.val.i) {
+		*result = value_by_int(1);
+		return true;
+	}
+
+	*result = value_by_int(0);
+	return true;
 }
 
 static bool

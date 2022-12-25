@@ -43,7 +43,7 @@ void wms_yyerror(const char *s);
 %token TOKEN_LPAR TOKEN_RPAR TOKEN_LBLK TOKEN_RBLK TOKEN_LARR TOKEN_RARR
 %token TOKEN_SEMICOLON TOKEN_COMMA TOKEN_IF TOKEN_ELSE TOKEN_WHILE TOKEN_FOR
 %token TOKEN_IN TOKEN_DOTDOT TOKEN_GT TOKEN_GTE TOKEN_LT TOKEN_LTE TOKEN_EQ
-%token TOKEN_RETURN TOKEN_BREAK TOKEN_CONTINUE
+%token TOKEN_RETURN TOKEN_BREAK TOKEN_CONTINUE TOKEN_AND TOKEN_OR
 
 %type <func_list> func_list;
 %type <func> func;
@@ -65,6 +65,8 @@ void wms_yyerror(const char *s);
 %type <term> term;
 %type <arg_list> arg_list;
 
+%left TOKEN_OR
+%left TOKEN_AND
 %left TOKEN_LT
 %left TOKEN_LTE
 %left TOKEN_GT
@@ -327,6 +329,16 @@ expr		: term
 			$$ = wms_make_expr_with_term($1);
 			debug("single term expr");
 		}
+		| expr TOKEN_OR expr
+		{
+			$$ = wms_make_expr_with_or($1, $3);
+			debug("or expr");
+		}
+		| expr TOKEN_AND expr
+		{
+			$$ = wms_make_expr_with_and($1, $3);
+			debug("and expr");
+		}
 		| expr TOKEN_LT expr
 		{
 			$$ = wms_make_expr_with_lt($1, $3);
@@ -380,7 +392,7 @@ expr		: term
 		| TOKEN_LPAR expr TOKEN_RPAR
 		{
 			$$ = $2;
-			debug("(expr) expr\n");
+			debug("(expr) expr");
 		}
 		;
 term		: TOKEN_INT
