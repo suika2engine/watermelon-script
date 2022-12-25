@@ -236,7 +236,8 @@ func main() {
 }
 ```
 
-Note that file I/O is not implemented in the CLI by default but you can implement it by FFI.
+Note that file I/O is not implemented in the CLI by default
+but you can implement it by FFI.
 
 ### Calling C Functions
 
@@ -252,3 +253,6 @@ func main() {
     print(a["hello"]);
 }
 ```
+
+A FFI function can accept up to 16 arguments and can return a value.
+There are so many APIs to manipulate int, float, string and array values.

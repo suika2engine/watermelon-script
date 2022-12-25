@@ -2096,7 +2096,7 @@ do_call(
 		if (strcmp(intrinsic[i].name, func_name) == 0)
 			return intrinsic[i].func(rt, term->val.call.arg_list, val);
 
-	/* Search for foreign functions. */
+	/* Search for FFI functions. */
 	ffi_func = rt->ffi_func_list;
 	while (ffi_func != NULL) {
 		if (strcmp(ffi_func->name, func_name) == 0)
@@ -2104,7 +2104,7 @@ do_call(
 		ffi_func = ffi_func->next;
 	}
 
-	/* Search for user defined functions. */
+	/* Search for normal functions. */
 	func = rt->func_list->list;
 	while (func != NULL) {
 		if (strcmp(func->name, func_name) == 0)
@@ -2593,8 +2593,7 @@ decrement_str_ref(
 
 	/* GC */
 	free(rt->str_pool[s_index].s);
-	rt->str_pool[s_index].s = NULL;
-	rt->str_pool[s_index].is_used = false;
+	memset(&rt->str_pool[s_index], 0, sizeof(struct wms_str_elem));
 }
 
 static void
@@ -2634,7 +2633,7 @@ decrement_array_ref(
 	struct wms_runtime *rt,
 	int a_index)
 {
-	struct wms_array_elem *elem;
+	struct wms_array_elem *elem, *next;
 
 	assert(rt->elem_pool[a_index].is_used);
 	assert(rt->elem_pool[a_index].ref > 0);
@@ -2647,14 +2646,15 @@ decrement_array_ref(
 	/* GC */
 	elem = get_array_head(rt, a_index);
 	while (elem != NULL) {
-		elem->is_used = false;
+		next = elem->next;
 		if (!elem->is_head) {
 			if (elem->val.type.is_str)
 				decrement_str_ref(rt, elem->val.val.s_index);
 			else if (elem->val.type.is_array)
 				decrement_array_ref(rt, elem->val.val.a_index);
 		}
-		elem = elem->next;
+		memset(elem, 0, sizeof(struct wms_array_elem));
+		elem = next;
 	}
 }
 
