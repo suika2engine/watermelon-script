@@ -21,7 +21,7 @@ wms_lexer.yy.c: wms_lexer.l
 	flex -o wms_lexer.yy.c --prefix=wms_yy wms_lexer.l
 
 # install
-install: wms_parser.tab.c wms_parser.y wms_lexer.yy.c wms_lexer.l wms_core.c wms_core.h wms.h
+install: wms_parser.tab.c wms_parser.tab.h wms_parser.y wms_lexer.yy.c wms_lexer.l wms_core.c wms_core.h wms.h
 	cp $^ ../suika2/src/
 
 # cleanup
