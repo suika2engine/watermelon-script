@@ -120,7 +120,7 @@ static bool hello(struct wms_runtime *rt)
 }
 
 /*
- * Printer. (for print() intrinsic function)
+ * Printer. (for print() intrinsic)
  */
 int wms_printf(const char *s, ...)
 {
@@ -132,4 +132,18 @@ int wms_printf(const char *s, ...)
 	va_end(ap);
 
 	return ret;
+}
+
+/*
+ * Reader. (for readline() intrinsic)
+ */
+int wms_readline(char *buf, size_t len)
+{
+	int ret;
+	if (fgets(buf, len, stdin) == NULL)
+		return 0;
+	ret = strlen(buf);
+	if (ret > 0)
+		buf[ret - 1] = '\0';
+	return ret - 1;
 }

@@ -41,6 +41,9 @@ void wms_free_runtime(struct wms_runtime *rt);
 /* Must be implemented by the main code. */
 int wms_printf(const char *s, ...);
 
+/* Must be implemented by the main code. */
+int wms_readline(char *buf, size_t len);
+
 /*
  * Foreign Function Interface
  */

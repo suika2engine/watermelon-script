@@ -113,6 +113,7 @@ static bool rterror(struct wms_runtime *rt, const char *msg, ...);
 typedef bool (*intrinsic_func)(struct wms_runtime *rt, struct wms_arg_list *arg_list, struct wms_value *ret);
 
 static bool intrinsic_print(struct wms_runtime *rt, struct wms_arg_list *arg_list, struct wms_value *ret);
+static bool intrinsic_readline(struct wms_runtime *rt, struct wms_arg_list *arg_list, struct wms_value *ret);
 static bool intrinsic_remove(struct wms_runtime *rt, struct wms_arg_list *arg_list, struct wms_value *ret);
 static bool intrinsic_size(struct wms_runtime *rt, struct wms_arg_list *arg_list, struct wms_value *ret);
 static bool intrinsic_isint(struct wms_runtime *rt, struct wms_arg_list *arg_list, struct wms_value *ret);
@@ -125,6 +126,7 @@ struct intrinsic {
 	intrinsic_func func;
 } intrinsic[] = {
 	{"print", intrinsic_print},
+	{"readline", intrinsic_readline},
 	{"remove", intrinsic_remove},
 	{"size", intrinsic_size},
 	{"isint", intrinsic_isint},
@@ -2077,20 +2079,7 @@ do_call(
 	assert(term != NULL);
 	assert(val != NULL);
 
-	/* Search for intrinsics. */
-	for (i = 0; i < (int)(sizeof(intrinsic) / sizeof(struct intrinsic)); i++)
-		if (strcmp(intrinsic[i].name, term->val.call.func) == 0)
-			return intrinsic[i].func(rt, term->val.call.arg_list, val);
-
-	/* Search for foreign functions. */
-	ffi_func = rt->ffi_func_list;
-	while (ffi_func != NULL) {
-		if (strcmp(ffi_func->name, term->val.call.func) == 0)
-			return call_ffi_func(rt, ffi_func, term->val.call.arg_list, val);
-		ffi_func = ffi_func->next;
-	}
-
-	/* Search for string variables. */
+	/* Search for string variables. (Replace the function name.) */
 	var = rt->frame->var_list;
 	func_name = term->val.call.func;
 	while (var != NULL) {
@@ -2100,6 +2089,19 @@ do_call(
 			break;
 		}
 		var = var->next;
+	}
+
+	/* Search for intrinsics. */
+	for (i = 0; i < (int)(sizeof(intrinsic) / sizeof(struct intrinsic)); i++)
+		if (strcmp(intrinsic[i].name, func_name) == 0)
+			return intrinsic[i].func(rt, term->val.call.arg_list, val);
+
+	/* Search for foreign functions. */
+	ffi_func = rt->ffi_func_list;
+	while (ffi_func != NULL) {
+		if (strcmp(ffi_func->name, func_name) == 0)
+			return call_ffi_func(rt, ffi_func, term->val.call.arg_list, val);
+		ffi_func = ffi_func->next;
 	}
 
 	/* Search for user defined functions. */
@@ -2696,6 +2698,24 @@ intrinsic_print(
 	}
 	wms_printf("\n");
 	return true;
+}
+
+static bool
+intrinsic_readline(
+	struct wms_runtime *rt,
+	struct wms_arg_list *arg_list,
+	struct wms_value *val)
+{
+	char buf[1024];
+
+	(void)arg_list;
+	assert(rt != NULL);
+	assert(val != NULL);
+
+	if (wms_readline(buf, sizeof(buf)) == 0)
+		return false;
+
+	return value_by_str(rt, val, buf);
 }
 
 static void

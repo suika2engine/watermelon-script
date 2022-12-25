@@ -225,6 +225,19 @@ String to floating point.
    f = 0.0 + "1.23";
 ```
 
+### Reading String
+
+In the CLI, you can use `readline()` function to input string from the terminal.
+It is for debug usage only.
+```
+func main() {
+    a = readline();
+    print(a);
+}
+```
+
+Note that file I/O is not implemented in the CLI by default but you can implement it by FFI.
+
 ### Calling C Functions
 
 WMS has Foreign Function Interface (FFI).
